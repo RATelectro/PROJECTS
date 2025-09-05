@@ -7,9 +7,9 @@ ProjectPath=Modular\VCA\VCA.PrjPcb
 [Project3]
 ProjectPath=keyboard dual\Keyboard_MultiBoard_Project\Keyboard_MultiBoard_Project.PrjMbd
 [Project4]
-ProjectPath=keyboard dual\keyboard dual_brain\keyboard dual_brain.PrjPcb
-[Project5]
 ProjectPath=keyboard dual\keyboard_dual.PrjPcb
+[Project5]
+ProjectPath=keyboard dual\keyboard dual_brain\keyboard dual_brain.PrjPcb
 [Project6]
 ProjectPath=Modular\TuringSMD\TuringSMD.PrjPcb
 [Project7]
