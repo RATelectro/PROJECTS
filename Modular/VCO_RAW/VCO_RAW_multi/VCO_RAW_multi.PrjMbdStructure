@@ -1,0 +1,4 @@
+Record=DiagramHierarchy|SourceDocument=VCO_RAW_multi.MbsDoc|Kind=Multi-board Schematic Module|Designator=1|Source=..\VCO_RAW.PrjPcb
+Record=SubProject|SourceDocument=VCO_RAW_multi.MbsDoc|ProjectPath=..\VCO_RAW.PrjPcb
+Record=DiagramHierarchy|SourceDocument=VCO_RAW_multi.MbsDoc|Kind=Multi-board Schematic Module|Designator=2|Source=..\VCO_RAW.PrjPcb
+Record=SubProject|SourceDocument=VCO_RAW_multi.MbsDoc|ProjectPath=..\VCO_RAW.PrjPcb

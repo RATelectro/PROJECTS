@@ -1,0 +1,22 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: VCO_RAW_Front.PcbDoc   8/7/2025  12:42:13 PM
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : VCO_RAW_Front-RoundHoles.TXT
+ASCII SlotHoles File : VCO_RAW_Front-SlotHoles.TXT
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      1.1mm (43mil)                                             Round             18        PTH        87.33mm (3.44inch)
+T2      1.5mm (59mil)                                             Round             12        PTH        61.37mm (2.42inch)
+T3      2.6mm (102mil)                                            Round             4         PTH        51.37mm (2.02inch)
+T4      3.5mm (138mil)                                            Round             2         PTH        122.50mm (4.82inch)
+T5      3.5mm (138mil)                                            Slot              2         PTH        246.00mm (9.69inch)
+T6      6.5mm (256mil)                                            Round             5         PTH        78.13mm (3.08inch)
+T7      7mm (276mil)                                              Round             1         PTH        0.00mm (0.00inch)
+T8      7.5mm (295mil)                                            Round             4         PTH        51.37mm (2.02inch)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              48
+
+Total Processing Time (hh:mm:ss) : 00:00:01

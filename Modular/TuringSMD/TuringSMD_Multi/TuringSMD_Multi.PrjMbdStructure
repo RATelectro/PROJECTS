@@ -1,0 +1,6 @@
+Record=DiagramHierarchy|SourceDocument=TuringSMD_Multi.MbsDoc|Kind=Multi-board Schematic Module|Designator=1|Source=..\TuringSMD.PrjPcb
+Record=SubProject|SourceDocument=TuringSMD_Multi.MbsDoc|ProjectPath=..\TuringSMD.PrjPcb
+Record=DiagramHierarchy|SourceDocument=TuringSMD_Multi.MbsDoc|Kind=Multi-board Schematic Module|Designator=2|Source=..\TuringSMD.PrjPcb
+Record=SubProject|SourceDocument=TuringSMD_Multi.MbsDoc|ProjectPath=..\TuringSMD.PrjPcb
+Record=DiagramHierarchy|SourceDocument=TuringSMD_Multi.MbsDoc|Kind=Multi-board Schematic Module|Designator=3|Source=..\TuringSMD.PrjPcb
+Record=SubProject|SourceDocument=TuringSMD_Multi.MbsDoc|ProjectPath=..\TuringSMD.PrjPcb

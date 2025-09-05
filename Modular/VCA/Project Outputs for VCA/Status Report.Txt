@@ -1,0 +1,12 @@
+Output: NC Drill Files
+Type  : NC Drill
+From  : Project [VCA.PrjPcb]
+   Generated File[VCA.TXT]
+   Generated File[VCA.LDP]
+   Generated File[VCA.DRR]
+
+
+Files Generated   : 3
+Documents Printed : 0
+
+Finished Output Generation At 1:39:23 PM On 8/7/2025

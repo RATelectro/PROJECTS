@@ -1,0 +1,3 @@
+Layer Pairs Export File for PCB: D:\YandexDisk\Stud\PROJECTS\keyboard dual\keyboard.PcbDoc
+LayersSetName=Top_Bot_Thru_Holes|DrillFile=keyboard-roundholes.txt|DrillLayers=gtl,gbl
+LayersSetName=Top_Bot_Slot_Holes|DrillFile=keyboard-slotholes.txt|DrillLayers=gtl,gbl

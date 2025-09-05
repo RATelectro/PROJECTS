@@ -1,0 +1,18 @@
+[ProjectGroup]
+Version=1.0
+[Project1]
+ProjectPath=Modular\VCO_RAW\VCO_RAW.PrjPcb
+[Project2]
+ProjectPath=Modular\VCA\VCA.PrjPcb
+[Project3]
+ProjectPath=keyboard dual\Keyboard_MultiBoard_Project\Keyboard_MultiBoard_Project.PrjMbd
+[Project4]
+ProjectPath=keyboard dual\keyboard dual_brain\keyboard dual_brain.PrjPcb
+[Project5]
+ProjectPath=keyboard dual\keyboard_dual.PrjPcb
+[Project6]
+ProjectPath=Modular\TuringSMD\TuringSMD.PrjPcb
+[Project7]
+ProjectPath=Modular\VCA\VCA_multi\VCA_multi.PrjMbd
+[Project8]
+ProjectPath=Modular\TuringSMD\TuringSMD_Multi\TuringSMD_Multi.PrjMbd

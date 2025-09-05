@@ -1,0 +1,13 @@
+Output: NC Drill Files
+Type  : NC Drill
+From  : Project [keyboard_dual.PrjPcb]
+   Generated File[keyboard-RoundHoles.TXT]
+   Generated File[keyboard-SlotHoles.TXT]
+   Generated File[keyboard.LDP]
+   Generated File[keyboard.DRR]
+
+
+Files Generated   : 4
+Documents Printed : 0
+
+Finished Output Generation At 9:38:15 AM On 8/6/2025

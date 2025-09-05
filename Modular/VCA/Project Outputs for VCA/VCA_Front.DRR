@@ -1,0 +1,21 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: VCA_Front.PcbDoc   8/7/2025  12:47:22 PM
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : VCA_Front-RoundHoles.TXT
+ASCII SlotHoles File : VCA_Front-SlotHoles.TXT
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      1.1mm (43mil)                                             Round             24        PTH        109.20mm (4.30inch)
+T2      1.5mm (59mil)                                             Round             12        PTH        90.00mm (3.54inch)
+T3      2.6mm (102mil)                                            Round             4         PTH        80.00mm (3.15inch)
+T4      3.5mm (138mil)                                            Round             2         PTH        122.50mm (4.82inch)
+T5      3.5mm (138mil)                                            Slot              2         PTH        246.00mm (9.69inch)
+T6      6.5mm (256mil)                                            Round             8         PTH        180.10mm (7.09inch)
+T7      7.5mm (295mil)                                            Round             4         PTH        80.00mm (3.15inch)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              56
+
+Total Processing Time (hh:mm:ss) : 00:00:00

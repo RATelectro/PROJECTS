@@ -1,0 +1,12 @@
+Output: NC Drill Files
+Type  : NC Drill
+From  : Project [VCO_RAW.PrjPcb]
+   Generated File[VCO_RAW.TXT]
+   Generated File[VCO_RAW.LDP]
+   Generated File[VCO_RAW.DRR]
+
+
+Files Generated   : 3
+Documents Printed : 0
+
+Finished Output Generation At 1:39:52 PM On 8/7/2025
