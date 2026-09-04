@@ -1,0 +1,27 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: Keyb_ESP32_simple.PcbDoc   8/25/2026  4:27:42 PM
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : Keyb_ESP32_simple-RoundHoles.TXT
+ASCII SlotHoles File : Keyb_ESP32_simple-SlotHoles.TXT
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      0.305mm (12mil)                                           Round             274       PTH        1757.82mm (69.21inch)
+T2      0.8mm (31mil)                                             Slot              28        PTH        181.51mm (7.15inch)
+T3      0.889mm (35mil)                                           Round             20        PTH        122.66mm (4.83inch)
+T4      1mm (39mil)                                               Round             10        PTH        194.50mm (7.66inch)
+T5      2mm (79mil)                                               Round             16        PTH        681.36mm (26.83inch)
+T6      1.7mm (67mil)                                             Round             70        NPTH       922.16mm (36.31inch)
+T7      2.95mm (116mil)                                           Round             70        NPTH       914.75mm (36.01inch)
+T8      3.98mm (157mil)                                           Round             35        NPTH       722.00mm (28.43inch)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              523
+
+Two holes at same point : 2
+-----------------------
+1105,3430
+825,3430
+
+Total Processing Time (hh:mm:ss) : 00:00:00

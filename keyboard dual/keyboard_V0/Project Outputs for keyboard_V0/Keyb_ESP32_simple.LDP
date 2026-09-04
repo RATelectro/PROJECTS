@@ -1,0 +1,3 @@
+Layer Pairs Export File for PCB: D:\YandexDisk\Stud\PROJECTS\keyboard dual\keyboard_V0\Keyb_ESP32_simple.PcbDoc
+LayersSetName=Top_Bot_Thru_Holes|DrillFile=keyb_esp32_simple-roundholes.txt|DrillLayers=gtl,gbl
+LayersSetName=Top_Bot_Slot_Holes|DrillFile=keyb_esp32_simple-slotholes.txt|DrillLayers=gtl,gbl

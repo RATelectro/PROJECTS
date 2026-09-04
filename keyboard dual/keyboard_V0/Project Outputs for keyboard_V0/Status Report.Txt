@@ -1,0 +1,21 @@
+Output: Gerber Files
+Type  : Gerber
+From  : Variant [[No Variations]] of Project [keyboard_V0.PrjPcb]
+   Generated File[Keyb_ESP32_simple.GTO]
+   Generated File[Keyb_ESP32_simple.GTP]
+   Generated File[Keyb_ESP32_simple.GTS]
+   Generated File[Keyb_ESP32_simple.GTL]
+   Generated File[Keyb_ESP32_simple.GBL]
+   Generated File[Keyb_ESP32_simple.GBS]
+   Generated File[Keyb_ESP32_simple.GBP]
+   Generated File[Keyb_ESP32_simple.GBO]
+   Generated File[Keyb_ESP32_simple.GM3]
+   Generated File[Keyb_ESP32_simple.RUL]
+   Generated File[Keyb_ESP32_simple.EXTREP]
+   Generated File[Keyb_ESP32_simple.REP]
+
+
+Files Generated   : 12
+Documents Printed : 0
+
+Finished Output Generation At 11:55:42 AM On 8/27/2026
