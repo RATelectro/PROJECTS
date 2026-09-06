@@ -18,3 +18,5 @@ ProjectPath=Modular\VCA\VCA_multi\VCA_multi.PrjMbd
 ProjectPath=Modular\TuringSMD\TuringSMD_Multi\TuringSMD_Multi.PrjMbd
 [Project9]
 ProjectPath=keyboard dual\keyboard_V0\keyboard_V0.PrjPcb
+[Project10]
+ProjectPath=keyboard dual\Keyboard_V0.1\Keyboard_V0.1.PrjPcb

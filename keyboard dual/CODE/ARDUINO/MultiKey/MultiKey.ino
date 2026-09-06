@@ -1,21 +1,12 @@
-/* @file MultiKey.ino
-|| @version 1.0
-|| @author Mark Stanley
-|| @contact mstanley@technologist.com
-||
-|| @description
-|| | The latest version, 3.0, of the keypad library supports up to 10
-|| | active keys all being pressed at the same time. This sketch is an
-|| | example of how you can get multiple key presses from a keypad or
-|| | keyboard.
-|| #
-*/
-
-
-
-
+// @file MultiKey.ino
 #include <Keypad.h>
+/* @file Keypad.h
+|| @version 3.1
+|| @author Mark Stanley, Alexander Brevig
+|| @contact mstanley@technologist.com, alexanderbrevig@gmail.com*/
 #include <Keyboard.h>
+/*   Copyright (c) 2015, Arduino LLC
+  Original code (pre-library): Copyright (c) 2011, Peter Barrett*/
 #include <FastLED.h>
 #include <HardwareSerial.h>
 #include <SoftwareSerial.h>
@@ -130,7 +121,7 @@ char keys[ROWS][COLS] = {
   { KEY_F1,     '1', 'q',           'a',            'z' },
   { KEY_ESC,    '~', KEY_TAB,       KEY_LEFT_SHIFT, KEY_LEFT_CTRL }
 };
-byte colPins[COLS] = { PB4, PB5, PC13, PC14, PB8 };                //connect to the row pinouts of the kpd
+byte colPins[COLS] = { PB4, PB5, PC13, PC14, PB8 };                //connect to the row pinouts of the kpd (i have them swapped)
 byte rowPins[ROWS] = { PB1, PB10, PB11, PB12, PB13, PB14, PB15 };  //connect to the column pinouts of the kpd
 
 Keypad kpd = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
