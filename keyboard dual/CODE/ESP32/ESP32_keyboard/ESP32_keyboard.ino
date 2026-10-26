@@ -71,21 +71,21 @@
 //
 // These are compile-time configurable.
 
-#define MATRIX_ROW_0 0
-#define MATRIX_ROW_1 1
-#define MATRIX_ROW_2 3
-#define MATRIX_ROW_3 4
-#define MATRIX_ROW_4 5
+#define MATRIX_ROW_0 20
+#define MATRIX_ROW_1 10
+#define MATRIX_ROW_2 9
+#define MATRIX_ROW_3 8
+#define MATRIX_ROW_4 7
 #define MATRIX_ROW_5 6
-#define MATRIX_ROW_6 7
+#define MATRIX_ROW_6 5
 
-#define MATRIX_COL_0 2
-#define MATRIX_COL_1 9
-#define MATRIX_COL_2 10
-#define MATRIX_COL_3 20
-#define MATRIX_COL_4 21
+#define MATRIX_COL_0 21
+#define MATRIX_COL_1 0
+#define MATRIX_COL_2 1
+#define MATRIX_COL_3 2
+#define MATRIX_COL_4 3
 
-#define LED_PIN 8
+#define LED_PIN 4
 
 
 const uint8_t rowPins[ROWS] = {
@@ -171,7 +171,7 @@ const uint8_t colPins[COLS] = {
 
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812B
-#define BRIGHTNESS 20
+#define BRIGHTNESS 50
 #define LED_UPD_INTERVAL 50   //ms
 #define HELLO_SWEEP_SPEED 100  // ms, delay
 
@@ -2024,6 +2024,15 @@ void setup() {
     );
 
     printHelp();
+
+      fill_rainbow(leds, 35, 128, 7);
+      FastLED.show();
+      delay(200);
+      FastLED.clear();
+      fill_rainbow(leds, 35, 128, 7);
+      FastLED.show();
+      delay(200);
+      FastLED.clear();
 }
 
 
