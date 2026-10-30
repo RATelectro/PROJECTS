@@ -2027,11 +2027,11 @@ void setup() {
 
       fill_rainbow(leds, 35, 128, 7);
       FastLED.show();
-      delay(200);
+      delay(500);
       FastLED.clear();
-      fill_rainbow(leds, 35, 128, 7);
+      fill_rainbow(leds, 35, 58, 7);
       FastLED.show();
-      delay(200);
+      delay(500);
       FastLED.clear();
 }
 
