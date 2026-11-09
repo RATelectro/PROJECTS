@@ -164,7 +164,7 @@ const uint8_t colPins[COLS] = {
 //
 // Total = 31 bytes.
 
-#define USE_NKRO 0
+#define USE_NKRO 1
 
 
 // --------------------------- FastLED ---------------------------------------
