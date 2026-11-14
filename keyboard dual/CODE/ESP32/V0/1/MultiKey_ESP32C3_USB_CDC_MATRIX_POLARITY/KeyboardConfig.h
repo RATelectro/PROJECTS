@@ -14,7 +14,7 @@ constexpr uint8_t LAYER_NAME_LENGTH = 16;
 extern const uint8_t ROW_PINS[ROWS];
 extern const uint8_t COL_PINS[COLS];
 
-constexpr uint8_t LED_PIN = 4;
+constexpr uint8_t LED_PIN = 2;
 constexpr uint8_t DEFAULT_BRIGHTNESS = 50;
 constexpr uint32_t LED_UPDATE_INTERVAL_MS = 30;
 constexpr uint32_t HELLO_SWEEP_SPEED_MS = 100;

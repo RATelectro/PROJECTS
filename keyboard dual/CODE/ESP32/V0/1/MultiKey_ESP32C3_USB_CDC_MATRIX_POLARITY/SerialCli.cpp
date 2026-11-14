@@ -148,6 +148,8 @@ void printHelp() {
 void SerialCli::begin() {
     Serial.printf("OK READY version=%s protocol=%u\n",
                   Config::FIRMWARE_VERSION, Config::SERIAL_PROTOCOL_VERSION);
+    Serial.println("------------------------------");
+    Serial.println("Type HELP to view command list");
 }
 
 void SerialCli::update() {
