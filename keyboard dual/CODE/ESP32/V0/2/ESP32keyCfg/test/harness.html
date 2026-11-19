@@ -117,11 +117,13 @@
       </div>
       <div class="row wrap">
         <button id="btn-led-read" class="btn">Read from keyboard</button>
+        <button id="btn-led-save" class="btn">Save LED settings now</button>
         <button id="btn-led-hello" class="btn">Play hello sweep</button>
         <span id="led-flags" class="hint"></span>
       </div>
-      <div class="hint">LED settings are runtime-only on this firmware: they are not stored in the
-        keyboard and revert to defaults after reboot.</div>
+      <div class="hint">LED settings are saved to the keyboard automatically (about 2 s after the
+        last change) and restored at boot, so they survive power loss. Use “Save LED settings now”
+        to persist immediately without waiting.</div>
     </div>
   </section>
 

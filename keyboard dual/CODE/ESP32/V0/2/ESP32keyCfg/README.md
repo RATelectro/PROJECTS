@@ -35,7 +35,9 @@ with zero dependencies.
 LEDs on/off, global brightness (0–255), base effect (OFF/STATIC/RAINBOW/BREATHE/CUSTOM),
 static/pulse color, keypress animation (OFF/PULSE/SPARKLE/RIPPLE), sleep animation
 (OFF/BREATHE/RAINBOW), sleep timeout (ms, 0 = never), BLE connect indicators, hello-sweep test.
-These settings are runtime-only in the firmware and are not persisted across reboots.
+With firmware 2.0.0+ these settings are stored in the keyboard's flash automatically
+(~2 s after the last change, or immediately via “Save LED settings now”) and restored
+at boot; with older firmware they are runtime-only until you update.
 
 ### Device tab
 Firmware/protocol info, BLE status, live pressed-key monitor, manual
@@ -65,7 +67,7 @@ The drawer at the bottom shows all serial traffic and accepts raw firmware comma
 | `js/protocol.js` | pure protocol/model logic: parsers, serializers, diffing, validation, factory defaults |
 | `js/app.js` | Web Serial client and all UI logic (backups/presets use IndexedDB) |
 | `test/protocol.test.mjs` | Node test-suite for `js/protocol.js` — `node test/protocol.test.mjs` |
-| `test/harness.html` + `test/mock-serial.js` + `test/scenario.js` | Browser end-to-end test with a scripted mock firmware (no hardware needed): serve the folder, open `test/harness.html`, all 22 checks must show PASS in the page title |
+| `test/harness.html` + `test/mock-serial.js` + `test/scenario.js` | Browser end-to-end test with a scripted mock firmware (no hardware needed): serve the folder, open `test/harness.html`, all 25 checks must show PASS in the page title |
 | `start.bat` | local-server launcher for Windows |
 
 ## Safety notes

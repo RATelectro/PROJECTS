@@ -22,5 +22,5 @@ goto :open
 
 :open
 timeout /t 1 /nobreak >nul
-start "" "http://localhost:8321/index.html"
+start "" "http://localhost:8321/index.html?v=%RANDOM%%RANDOM%"
 goto :eof

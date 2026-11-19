@@ -25,6 +25,7 @@
       names: ['base', 'numbers', 'layer 3', 'system', 'layer 5', 'layer 6', 'layer 7', 'layer 8'],
       keymaps, saveCount: 0, setKeyCount: 0,
       led: { enabled: 1, brightness: 50, effect: 0, color: '021400', keypress: 0, sleep: 1, sleepTimeout: 0, sleeping: 0, ble: 1 },
+      ledSaveCount: 0,
     };
   }
 
@@ -184,6 +185,7 @@
             else if (sub === 'SLEEP') s.led.sleep = ['OFF', 'BREATHE', 'RAINBOW'].indexOf(args[2].toUpperCase());
             else if (sub === 'SLEEP_TIMEOUT') s.led.sleepTimeout = num(args[2]);
             else if (sub === 'BLE') s.led.ble = args[2].toUpperCase() === 'ON' ? 1 : 0;
+            else if (sub === 'SAVE') s.ledSaveCount++;
             reply.push(`OK LED ${sub}`);
           }
           break;

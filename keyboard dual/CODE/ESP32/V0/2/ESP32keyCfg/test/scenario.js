@@ -122,6 +122,17 @@
       await sleep(150);
       report(S().led.effect === 2, 'T6 LED base effect = RAINBOW on device');
 
+      // --- T6b/T6c/T6d: explicit save + persistence across reconnect ----------
+      document.getElementById('btn-led-save').click();
+      await sleep(400);
+      report(S().ledSaveCount >= 1, 'T6b LED SAVE executed');
+      document.getElementById('btn-connect').click(); // disconnect
+      await waitFor(() => document.body.classList.contains('offline'), 5000, 'disconnect');
+      document.getElementById('btn-connect').click(); // reconnect (board "reboots")
+      await waitFor(() => !document.body.classList.contains('offline'), 15000, 'reconnect');
+      report(S().led.effect === 2, 'T6c LED effect persisted across reconnect');
+      report(document.getElementById('led-effect').value === 'RAINBOW', 'T6d GUI shows persisted LED effect');
+
       // --- T7: hold threshold -------------------------------------------------
       const hold = document.getElementById('hold-ms');
       hold.value = '250';

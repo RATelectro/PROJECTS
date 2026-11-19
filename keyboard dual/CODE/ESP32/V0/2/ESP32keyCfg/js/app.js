@@ -1536,6 +1536,15 @@
     };
     $('#led-ble').onchange = () => ledCommand(`LED BLE ${$('#led-ble').checked ? 'ON' : 'OFF'}`, { bleIndicators: $('#led-ble').checked });
     $('#btn-led-read').onclick = readLed;
+    $('#btn-led-save').onclick = async () => {
+      if (!connected) { toast('Not connected', 'error'); return; }
+      try {
+        await client.send('LED SAVE', { timeoutMs: 5000 });
+        toast('LED settings saved to keyboard', 'success');
+      } catch (err) {
+        toast('LED SAVE failed: ' + err.message, 'error');
+      }
+    };
     $('#btn-led-hello').onclick = () => ledCommand('HELLO', null);
 
     // device tab
