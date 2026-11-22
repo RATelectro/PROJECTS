@@ -35,6 +35,7 @@
   <button class="tab active" data-tab="keymap">Keymap</button>
   <button class="tab" data-tab="led">LED</button>
   <button class="tab" data-tab="device">Device</button>
+  <button class="tab" data-tab="globals">Globals</button>
   <button class="tab" data-tab="presets">Presets</button>
   <button class="tab" data-tab="backups">Backups</button>
 </nav>
@@ -170,11 +171,150 @@
         <button id="btn-preset-keymap" class="btn needs-conn">Save whole keymap as preset</button>
         <button id="btn-preset-import" class="btn">Import from file…</button>
         <input id="preset-file" type="file" accept=".json,application/json" hidden>
+        <label class="field check"><input id="preset-multikey" type="checkbox"> mark as multikey preset</label>
       </div>
       <div class="hint">Presets are stored inside this app (browser profile) and can be exported as
         JSON files. Applying a preset edits the keymap locally — use “Apply to keyboard” on the
         Keymap tab to flash it (a backup is created automatically).</div>
       <div id="preset-list" class="list"></div>
+    </div>
+  </section>
+
+  <!-- ================= Globals (firmware 3.0) ================= -->
+  <section id="tab-globals" class="tab-page">
+    <div class="card">
+      <h2>Device settings</h2>
+      <div class="row wrap">
+        <button id="btn-globals-read" class="btn needs-conn">Read from keyboard</button>
+        <button id="btn-globals-write" class="btn primary needs-conn">Write to keyboard</button>
+      </div>
+      <div class="grid2">
+        <label class="field">Rollover
+          <select id="g-rollover"><option value="0">6KRO</option><option value="1">NKRO</option></select>
+        </label>
+        <label class="field">USB mode
+          <select id="g-usb"><option value="0">HID (needs OTG build)</option><option value="1">CFG (USB CDC)</option></select>
+        </label>
+        <label class="field">Bluetooth mode
+          <select id="g-bt"><option value="0">BT HID</option><option value="1">BT COM port</option></select>
+        </label>
+        <label class="field">BT TX power (0=-12dBm … 7=+9dBm)
+          <input id="g-btpower" type="number" min="0" max="7" step="1">
+        </label>
+        <label class="field">Key labels language
+          <select id="g-lang"><option value="0">EN</option><option value="1">RU</option></select>
+        </label>
+        <label class="field">OLED sleep timeout (s, 0 = never)
+          <input id="g-oledsleep" type="number" min="0" max="3600" step="5">
+        </label>
+        <label class="field">Boot menu
+          <select id="g-bootmenu"><option value="0">OFF</option><option value="1">ON</option></select>
+        </label>
+        <label class="field">Boot menu time (ms, min 1000)
+          <input id="g-boottime" type="number" min="1000" max="65535" step="250">
+        </label>
+        <label class="field">Menu nav LED brightness (0-255)
+          <input id="g-navbright" type="number" min="0" max="255" step="1">
+        </label>
+      </div>
+      <h3>Multikey</h3>
+      <div class="grid2">
+        <label class="field">Multikey mode
+          <select id="g-mk">
+            <option value="off">OFF</option>
+            <option value="master">Master (keyboard 0)</option>
+            <option value="1">Slave 1</option><option value="2">Slave 2</option>
+            <option value="3">Slave 3</option><option value="4">Slave 4</option>
+            <option value="5">Slave 5</option>
+          </select>
+        </label>
+        <label class="field">Multikey layout mode (stored with keymap)
+          <input id="g-mklayout" type="number" min="0" max="255" step="1">
+        </label>
+        <label class="field check"><input id="g-savechanges" type="checkbox"> Save slave config changes to master</label>
+        <label class="field check"><input id="g-showall" type="checkbox"> Show all keyboards on main view</label>
+      </div>
+      <div class="row wrap">
+        <button id="btn-mk-push" class="btn needs-conn">Push config to slaves</button>
+        <span class="hint">Device config slots:</span>
+        <span id="mk-slots" class="row wrap"></span>
+      </div>
+      <h3>Menu navigation keys</h3>
+      <div class="row wrap" id="g-navkeys"></div>
+    </div>
+
+    <div class="card">
+      <h2>Global LED (firmware 3.0)</h2>
+      <div class="hint">The brightness fader is nonlinear (gamma) for precise control of low
+        levels. Per-layer settings are stored inside the keymap and move with presets.</div>
+      <div class="row wrap">
+        <button id="btn-led3-read" class="btn needs-conn">Read from keyboard</button>
+        <button id="btn-led3-write" class="btn primary needs-conn">Write to keyboard</button>
+      </div>
+      <div class="grid2">
+        <label class="field">Global brightness (gamma fader)
+          <input id="l3-brightness" type="range" min="0" max="255" step="1">
+          <span id="l3-brightness-val" class="mono"></span>
+        </label>
+        <label class="field">Mix mode (animation stacking)
+          <select id="l3-mix">
+            <option value="0">ADD NORM (keeps hue)</option><option value="1">ADD CLIP</option>
+            <option value="2">MAX</option><option value="3">SCREEN</option><option value="4">HUE</option>
+          </select>
+        </label>
+        <label class="field">Effect speed (1-255, 128 = 1x)
+          <input id="l3-fxspeed" type="number" min="1" max="255" step="1">
+        </label>
+        <label class="field">Keypress anim speed
+          <input id="l3-kpspeed" type="number" min="1" max="255" step="1">
+        </label>
+        <label class="field">Sleep anim speed
+          <input id="l3-slspeed" type="number" min="1" max="255" step="1">
+        </label>
+        <label class="field">Backlight brightness (idle keys)
+          <input id="l3-backlight" type="range" min="0" max="255" step="1">
+          <span id="l3-backlight-val" class="mono"></span>
+        </label>
+        <label class="field">Backlight colour <input id="l3-backlight-color" type="color"></label>
+        <label class="field">Layer-change flash
+          <select id="l3-flash"><option value="0">OFF</option><option value="1">ON</option></select>
+        </label>
+        <label class="field">Flash: next-layer colour <input id="l3-flash-next" type="color"></label>
+        <label class="field">Flash: prev-layer colour <input id="l3-flash-prev" type="color"></label>
+        <label class="field">Flash fade (ms)
+          <input id="l3-flash-fade" type="number" min="100" max="5000" step="100">
+        </label>
+      </div>
+      <h3>Per-layer LED</h3>
+      <div class="row wrap">
+        <label class="field">Layer <select id="l3-layer"></select></label>
+        <label class="field">Brightness (gamma)
+          <input id="l3-layer-bright" type="range" min="0" max="255" step="1">
+          <span id="l3-layer-bright-val" class="mono"></span>
+        </label>
+        <label class="field">Effect
+          <select id="l3-layer-effect">
+            <option value="255">Follow global</option><option value="0">OFF</option>
+            <option value="1">STATIC</option><option value="2">RAINBOW</option>
+            <option value="3">BREATHE</option><option value="4">CUSTOM</option>
+          </select>
+        </label>
+        <label class="field">Layer colour (black = follow global)
+          <input id="l3-layer-color" type="color"></label>
+        <button id="btn-led3-layer-write" class="btn needs-conn">Write layer LED</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Palettes (16 user palettes, stored in keymap)</h2>
+      <div class="row wrap">
+        <label class="field">Palette <select id="pal-index"></select></label>
+        <button id="btn-pal-read" class="btn needs-conn">Read</button>
+        <button id="btn-pal-write" class="btn primary needs-conn">Write all stops</button>
+      </div>
+      <div id="pal-stops" class="row wrap"></div>
+      <div class="hint">Stops crossfade across the 0-255 palette position. Changes are written
+        into the keyboard keymap (presets and backups include them).</div>
     </div>
   </section>
 
@@ -227,6 +367,7 @@
 <script src="../js/protocol.js"></script>
 <script src="../js/app.js"></script>
 <pre id="test-results" style="position:fixed;top:0;right:0;background:#000;color:#0f0;z-index:999;font-size:11px;max-width:50vw;white-space:pre-wrap;"></pre>
+<script src="../js/globals.js"></script>
 <script src="scenario.js"></script>
 </body>
 </html>

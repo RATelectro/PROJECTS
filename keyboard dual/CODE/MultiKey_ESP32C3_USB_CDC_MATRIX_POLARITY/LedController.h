@@ -2,47 +2,13 @@
 
 #include <FastLED.h>
 #include "KeyboardConfig.h"
+#include "Settings.h"
 
-enum LedEffect : uint8_t {
-    LED_OFF = 0,
-    LED_STATIC = 1,
-    LED_RAINBOW = 2,
-    LED_BREATHE = 3,
-    LED_CUSTOM = 4
-};
-
-enum KeypressAnimation : uint8_t {
-    KEYPRESS_NONE = 0,
-    KEYPRESS_PULSE = 1,
-    KEYPRESS_SPARKLE = 2,
-    KEYPRESS_RIPPLE = 3
-};
-
-enum SleepAnimation : uint8_t {
-    SLEEP_OFF = 0,
-    SLEEP_BREATHE = 1,
-    SLEEP_RAINBOW = 2
-};
-
-// Persistent snapshot of the LED configuration: global animation settings
-// plus the custom per-key colors. Written to NVS as a CRC-checked blob and
-// loaded at boot, so LED settings survive power loss.
-struct __attribute__((packed)) LedSettings {
-    uint8_t enabled;
-    uint8_t brightness;
-    uint8_t effect;
-    uint8_t keypressAnimation;
-    uint8_t sleepAnimation;
-    uint8_t bleIndicators;
-    uint8_t colorR;
-    uint8_t colorG;
-    uint8_t colorB;
-    uint32_t sleepTimeoutMs;
-    uint8_t custom[Config::NUM_KEYS][3];
-};
-
-static_assert(sizeof(LedSettings) == 118, "LedSettings wire/storage size changed");
-
+// LedController renders the 7x5 LED matrix as a framebuffer that is refreshed
+// at LED_FPS (60). Every animation family (base effect, layer-change flash,
+// keypress fx, BLE indicator, menu/game overlay) is drawn into its own colour
+// plane and then combined with the configured mix algorithm, so effects stack
+// instead of overwriting each other and never collapse into dull black/white.
 class LedController {
 public:
     void begin();
@@ -52,33 +18,56 @@ public:
     void onKeyPressed(uint8_t keyIndex);
     void notifyActivity();
     void setBleConnected(bool connected);
+    void notifyLayerChanged(int8_t newLayer, int8_t prevLayer);
 
     void setEnabled(bool enabled);
-    bool enabled() const { return _enabled; }
+    bool enabled() const { return _s.enabled; }
     void setBrightness(uint8_t brightness);
-    uint8_t brightness() const { return _brightness; }
+    uint8_t brightness() const { return _s.brightness; }
     void setEffect(LedEffect effect);
-    LedEffect effect() const { return _effect; }
-    void setColor(CRGB color) { _color = color; noteSettingsChanged(); }
-    CRGB color() const { return _color; }
+    LedEffect effect() const { return static_cast<LedEffect>(_s.effect); }
+    void setColor(CRGB color);
+    CRGB color() const { return CRGB(_s.colorR, _s.colorG, _s.colorB); }
+    void setEffectSpeed(uint8_t speed);
+    uint8_t effectSpeed() const { return _s.effectSpeed; }
     void setKeypressAnimation(KeypressAnimation animation);
-    KeypressAnimation keypressAnimation() const { return _keypressAnimation; }
+    KeypressAnimation keypressAnimation() const { return static_cast<KeypressAnimation>(_s.keypressAnimation); }
+    void setKeypressSpeed(uint8_t speed);
+    uint8_t keypressSpeed() const { return _s.keypressSpeed; }
     void setSleepAnimation(SleepAnimation animation);
-    SleepAnimation sleepAnimation() const { return _sleepAnimation; }
+    SleepAnimation sleepAnimation() const { return static_cast<SleepAnimation>(_s.sleepAnimation); }
+    void setSleepSpeed(uint8_t speed);
+    uint8_t sleepSpeed() const { return _s.sleepSpeed; }
     void setSleepTimeout(uint32_t timeoutMs);
-    uint32_t sleepTimeout() const { return _sleepTimeoutMs; }
+    uint32_t sleepTimeout() const { return _s.sleepTimeoutMs; }
     bool sleeping() const { return _sleeping; }
-    void setBleIndicators(bool enabled) { _bleIndicators = enabled; noteSettingsChanged(); }
-    bool bleIndicators() const { return _bleIndicators; }
+    void setBleIndicators(bool enabled);
+    bool bleIndicators() const { return _s.bleIndicators != 0; }
+    void setMixMode(LedMixMode mode);
+    LedMixMode mixMode() const { return static_cast<LedMixMode>(_s.mixMode); }
+    void setBacklight(uint8_t brightness, CRGB color);
+    uint8_t backlightBrightness() const { return _s.backlightBrightness; }
+    CRGB backlightColor() const { return CRGB(_s.backlightR, _s.backlightG, _s.backlightB); }
+    void setLayerFlash(bool enabled, CRGB nextColor, CRGB prevColor, uint16_t fadeMs);
+    bool layerFlashEnabled() const { return _s.layerFlashEnabled != 0; }
+
+    // Per-layer LED settings travel with the keymap; the owner pushes the
+    // active layer's settings whenever the layer changes.
+    void applyLayerSettings(const LayerLedSettings &layer);
+    const LayerLedSettings &layerSettings() const { return _layer; }
 
     // Persistence: every settings mutation marks the controller dirty; the
-    // owner (MultiKey) writes captureSettings() to NVS after a quiet delay,
-    // or immediately when LED SAVE is issued.
-    void applySettings(const LedSettings &settings);  // loaded value: no dirty mark
-    LedSettings captureSettings() const;
+    // owner writes captureSettings() to NVS after a quiet delay, or
+    // immediately on LED SAVE.
+    void applySettings(const LedGlobalSettings &settings); // loaded value: no dirty mark
+    LedGlobalSettings captureSettings() const;
     bool settingsDirty() const { return _settingsDirty; }
     uint32_t settingsChangedAtMs() const { return _settingsChangedAtMs; }
     void markSettingsSaved() { _settingsDirty = false; }
+
+    // Overlay plane for menus/games: cleared every rendered frame.
+    void setOverlayColor(uint8_t keyIndex, CRGB color);
+    void clearOverlay();
 
     // Manual control switches to LED_CUSTOM. Key indices use matrix order.
     void setKeyColor(uint8_t keyIndex, CRGB color);
@@ -91,35 +80,47 @@ public:
     static uint8_t matrixToLedIndex(uint8_t row, uint8_t col);
 
 private:
-    void renderBase(uint32_t nowMs);
-    void renderBle(uint32_t nowMs);
-    void renderKeypresses(uint32_t nowMs);
+    void renderFrame(uint32_t nowMs);
+    void computeBase(CRGB *dst, uint32_t nowMs);
+    void computeSleep(CRGB *dst, uint32_t nowMs);
+    void computeFlash(CRGB *dst, uint32_t nowMs);
+    void computeKeypress(CRGB *dst, uint32_t nowMs);
+    void computeBle(CRGB *dst, uint32_t nowMs);
+    void applyBacklightFloor();
+    void mixInto(CRGB *dst, const CRGB *src);
+    CRGB mixPair(CRGB base, CRGB overlay);
     void noteSettingsChanged();
 
-    CRGB _leds[Config::NUM_KEYS];
-    CRGB _custom[Config::NUM_KEYS];
-    CRGB _color = CRGB(0, 20, 0);
-    uint8_t _brightness = Config::DEFAULT_BRIGHTNESS;
-    bool _enabled = true;
-    LedEffect _effect = LED_OFF;
-    KeypressAnimation _keypressAnimation = KEYPRESS_NONE;
-    SleepAnimation _sleepAnimation = SLEEP_BREATHE;
-    uint32_t _sleepTimeoutMs = Config::DEFAULT_SLEEP_TIMEOUT_MS;
+    CRGB _leds[Config::NUM_KEYS];     // physical output in LED strip order
+    CRGB _frame[Config::NUM_KEYS];    // combined framebuffer, matrix order
+    CRGB _plane[Config::NUM_KEYS];    // scratch plane for one animation source
+    CRGB _overlay[Config::NUM_KEYS];  // menu/game overlay plane
+    bool _overlaySet[Config::NUM_KEYS] = {};
+    bool _affected[Config::NUM_KEYS] = {}; // key touched by fx/overlay this frame
+
+    LedGlobalSettings _s = defaultLedGlobalSettings();
+    LayerLedSettings _layer = defaultLayerLedSettings();
+
     uint32_t _lastActivityMs = 0;
     uint32_t _lastFrameMs = 0;
     bool _sleeping = false;
 
-    bool _bleIndicators = true;
     bool _bleConnected = false;
     uint32_t _bleChangedAtMs = 0;
 
     bool _settingsDirty = false;
     uint32_t _settingsChangedAtMs = 0;
 
+    // keypress fx state
     bool _pulseActive[Config::NUM_KEYS] = {};
     uint32_t _pulseStartedAt[Config::NUM_KEYS] = {};
     CRGB _pulseColor[Config::NUM_KEYS] = {};
     uint32_t _rippleStartedAt = 0;
     uint8_t _rippleSource = 0;
     bool _rippleActive = false;
+
+    // layer-change flash state
+    bool _flashActive = false;
+    bool _flashNext = true;
+    uint32_t _flashStartedAt = 0;
 };

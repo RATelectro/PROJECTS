@@ -139,6 +139,14 @@ void printHelp() {
   Serial.println("SET LAYER_COUNT <1..8> | SET LAYER_NAME <layer> <name>");
   Serial.println("GET HOLD | SET HOLD <ms> | GET DIRTY | GET STATE");
   Serial.println("LED STATUS|ENABLE|BRIGHTNESS|COLOR|EFFECT|KEYPRESS|SLEEP|SLEEP_TIMEOUT|BLE|SET|CLEAR|HELLO");
+  Serial.println("LED SPEED <EFFECT|KEYPRESS|SLEEP> <1..255> | LED MIX <0..4>");
+  Serial.println("LED BACKLIGHT <0..255> [r g b] | LED LAYERFLASH <ON|OFF> [r g b] [r g b] [fadeMs]");
+  Serial.println("LED LAYER <layer> [BRIGHT|EFFECT|COLOR] ... | GET LEDLAYER <layer>");
+  Serial.println("GET GLOBAL | SET GLOBAL <field> <value>");
+  Serial.println("GET PALETTE <0..15> | SET PALETTE <idx> <stop> <r> <g> <b>");
+  Serial.println("PRESET SAVE <1..6> | PRESET LOAD <n> | PRESET LIST");
+  Serial.println("MULTIKEY STATUS|PUSH | MULTIKEY SLOT SAVE <n>|LOAD <n>");
+  Serial.println("MENU OPEN | MENU CLOSE | GAME LIST | GAME START <n> | GAME STOP");
   Serial.println("BLE STATUS | EVENTS ON|OFF | GET EVENTS");
   Serial.println("END HELP");
 }
@@ -277,6 +285,44 @@ void SerialCli::processLine(const char *line) {
                     _keyboard.hid().isConnected() ? "CONNECTED" : "ADVERTISING");
       return;
     }
+    if (strcasecmp(what, "LEDLAYER") == 0) {
+      uint32_t layer;
+      if (!rangedNumber(next(), 0, _keyboard.layerCount() - 1, layer)) {
+        Serial.println("ERR GET LEDLAYER invalid_layer");
+        return;
+      }
+      const LayerLedSettings s = _keyboard.layerLed(static_cast<uint8_t>(layer));
+      Serial.printf("OK LEDLAYER layer=%lu brightness=%u effect=%u color=%02X%02X%02X\n",
+                    static_cast<unsigned long>(layer), s.brightness, s.effect,
+                    s.colorR, s.colorG, s.colorB);
+      return;
+    }
+    if (strcasecmp(what, "GLOBAL") == 0) {
+      const GlobalSettings &g = _keyboard.globals();
+      Serial.printf("OK GLOBAL rollover=%u usb=%u bt=%u bt_power=%u mk=%u mk_id=%u mk_layout=%u save_slave=%u show_all=%u lang=%u oled_sleep=%lu nav=%u,%u,%u,%u,%u boot=%u boot_ms=%u nav_bright=%u\n",
+                    g.rollover, g.usbMode, g.btMode, g.btTxPower, g.multikeyEnabled,
+                    g.multikeyId, g.multikeyLayoutMode, g.saveSlaveChanges,
+                    g.showAllKeyboards, g.hidLang,
+                    static_cast<unsigned long>(g.oledSleepTimeoutMs),
+                    g.oledNavKeys[0], g.oledNavKeys[1], g.oledNavKeys[2],
+                    g.oledNavKeys[3], g.oledNavKeys[4],
+                    g.bootMenuEnabled, g.bootMenuTimeMs, g.menuNavBrightness);
+      return;
+    }
+    if (strcasecmp(what, "PALETTE") == 0) {
+      uint32_t index;
+      if (!rangedNumber(next(), 0, NUM_PALETTES - 1, index)) {
+        Serial.println("ERR GET PALETTE invalid_index");
+        return;
+      }
+      const Palette &p = _keyboard.palettes()[index];
+      Serial.printf("OK PALETTE index=%lu stops=%u\n", static_cast<unsigned long>(index), p.count);
+      for (uint8_t i = 0; i < p.count; ++i) {
+        Serial.printf("STOP %u %u %u %u\n", i, p.color[i][0], p.color[i][1], p.color[i][2]);
+      }
+      Serial.println("END PALETTE");
+      return;
+    }
     Serial.println("ERR GET unknown_argument");
     return;
   }
@@ -372,6 +418,117 @@ void SerialCli::processLine(const char *line) {
       Serial.printf("OK SET HOLD ms=%lu\n", static_cast<unsigned long>(duration));
       return;
     }
+    if (strcasecmp(what, "GLOBAL") == 0) {
+      char *field = next();
+      char *value = next();
+      if (field == nullptr || value == nullptr) {
+        Serial.println("ERR SET GLOBAL missing_argument");
+        return;
+      }
+      GlobalSettings &g = _keyboard.globals();
+      uint32_t num;
+      bool ok = true;
+      if (strcasecmp(field, "ROLLOVER") == 0) {
+        if (strcasecmp(value, "NKRO") == 0) g.rollover = ROLLOVER_NKRO;
+        else if (strcasecmp(value, "6KRO") == 0) g.rollover = ROLLOVER_6KRO;
+        else if (rangedNumber(value, 0, 1, num)) g.rollover = static_cast<uint8_t>(num);
+        else ok = false;
+      } else if (strcasecmp(field, "USB") == 0) {
+        if (strcasecmp(value, "HID") == 0) g.usbMode = USB_MODE_HID;
+        else if (strcasecmp(value, "CFG") == 0) g.usbMode = USB_MODE_CFG;
+        else if (rangedNumber(value, 0, 1, num)) g.usbMode = static_cast<uint8_t>(num);
+        else ok = false;
+      } else if (strcasecmp(field, "BT") == 0) {
+        if (strcasecmp(value, "HID") == 0) g.btMode = BT_MODE_HID;
+        else if (strcasecmp(value, "COM") == 0) g.btMode = BT_MODE_COM;
+        else if (rangedNumber(value, 0, 1, num)) g.btMode = static_cast<uint8_t>(num);
+        else ok = false;
+      } else if (strcasecmp(field, "BTPOWER") == 0) {
+        ok = rangedNumber(value, 0, 7, num);
+        if (ok) g.btTxPower = static_cast<uint8_t>(num);
+      } else if (strcasecmp(field, "MK") == 0) {
+        bool on;
+        ok = isOn(value, on);
+        if (ok) g.multikeyEnabled = on ? 1 : 0;
+      } else if (strcasecmp(field, "MKID") == 0) {
+        ok = rangedNumber(value, 0, 5, num);
+        if (ok) g.multikeyId = static_cast<uint8_t>(num);
+      } else if (strcasecmp(field, "MKLAYOUT") == 0) {
+        ok = rangedNumber(value, 0, 255, num);
+        if (ok) g.multikeyLayoutMode = static_cast<uint8_t>(num);
+      } else if (strcasecmp(field, "SAVECHANGES") == 0) {
+        bool on;
+        ok = isOn(value, on);
+        if (ok) g.saveSlaveChanges = on ? 1 : 0;
+      } else if (strcasecmp(field, "SHOWALL") == 0) {
+        bool on;
+        ok = isOn(value, on);
+        if (ok) g.showAllKeyboards = on ? 1 : 0;
+      } else if (strcasecmp(field, "LANG") == 0) {
+        if (strcasecmp(value, "RU") == 0) g.hidLang = HID_LABEL_RU;
+        else if (strcasecmp(value, "EN") == 0) g.hidLang = HID_LABEL_EN;
+        else if (rangedNumber(value, 0, 1, num)) g.hidLang = static_cast<uint8_t>(num);
+        else ok = false;
+      } else if (strcasecmp(field, "OLEDSLEEP") == 0) {
+        ok = number(value, num);
+        if (ok) g.oledSleepTimeoutMs = num * 1000UL;
+      } else if (strcasecmp(field, "BOOTMENU") == 0) {
+        bool on;
+        ok = isOn(value, on);
+        if (ok) g.bootMenuEnabled = on ? 1 : 0;
+      } else if (strcasecmp(field, "BOOTTIME") == 0) {
+        ok = rangedNumber(value, 1000, 65535, num);
+        if (ok) g.bootMenuTimeMs = static_cast<uint16_t>(num);
+      } else if (strcasecmp(field, "NAVBRIGHT") == 0) {
+        ok = rangedNumber(value, 0, 255, num);
+        if (ok) g.menuNavBrightness = static_cast<uint16_t>(num);
+      } else if (strcasecmp(field, "NAVKEYS") == 0) {
+        uint32_t first;
+        if (!rangedNumber(value, 0, Config::NUM_KEYS - 1, first)) { ok = false; }
+        else {
+          g.oledNavKeys[0] = static_cast<uint8_t>(first);
+          for (uint8_t i = 1; i < 5; ++i) {
+            if (!rangedNumber(next(), 0, Config::NUM_KEYS - 1, num)) { ok = false; break; }
+            g.oledNavKeys[i] = static_cast<uint8_t>(num);
+          }
+        }
+      } else {
+        ok = false;
+      }
+      if (!ok) {
+        Serial.println("ERR SET GLOBAL invalid_field");
+        return;
+      }
+      _keyboard.noteGlobalsChanged();
+      _keyboard.applyGlobalSettings();
+      Serial.println("OK SET GLOBAL");
+      return;
+    }
+    if (strcasecmp(what, "PALETTE") == 0) {
+      uint32_t index, stop, r, gch, b;
+      if (!rangedNumber(next(), 0, NUM_PALETTES - 1, index) ||
+          !rangedNumber(next(), 0, PALETTE_MAX_STOPS - 1, stop) ||
+          !rangedNumber(next(), 0, 255, r) || !rangedNumber(next(), 0, 255, gch) ||
+          !rangedNumber(next(), 0, 255, b)) {
+        Serial.println("ERR SET PALETTE invalid_value");
+        return;
+      }
+      Palette *palettes = _keyboard.palettes();
+      Palette &p = palettes[index];
+      if (p.count == 0) {
+        p.count = 2;
+      }
+      if (stop >= p.count) {
+        Serial.println("ERR SET PALETTE invalid_stop");
+        return;
+      }
+      p.color[stop][0] = static_cast<uint8_t>(r);
+      p.color[stop][1] = static_cast<uint8_t>(gch);
+      p.color[stop][2] = static_cast<uint8_t>(b);
+      _keyboard.savePalettes();
+      Serial.println("OK SET PALETTE");
+      return;
+    }
 
     // Original single-layer syntax: SET <row> <col> <usage> <mods>.
     uint32_t row, col, usage, mods;
@@ -444,10 +601,132 @@ void SerialCli::processLine(const char *line) {
     }
     LedController &led = _keyboard.led();
     if (strcasecmp(what, "STATUS") == 0) {
-      Serial.printf("OK LED enabled=%u brightness=%u effect=%u color=0x%02X%02X%02X keypress=%u sleep=%u sleep_timeout=%lu sleeping=%u ble_indicators=%u\n",
-                    led.enabled(), led.brightness(), led.effect(), led.color().r, led.color().g,
-                    led.color().b, led.keypressAnimation(), led.sleepAnimation(),
-                    static_cast<unsigned long>(led.sleepTimeout()), led.sleeping(), led.bleIndicators());
+      const LedGlobalSettings s = led.captureSettings();
+      Serial.printf("OK LED enabled=%u brightness=%u effect=%u fx_speed=%u color=0x%02X%02X%02X keypress=%u kp_speed=%u sleep=%u sleep_speed=%u sleep_timeout=%lu sleeping=%u ble_indicators=%u mix=%u backlight=%u#%02X%02X%02X flash=%u next=%02X%02X%02X prev=%02X%02X%02X fade=%u\n",
+                    s.enabled, s.brightness, s.effect, s.effectSpeed,
+                    s.colorR, s.colorG, s.colorB, s.keypressAnimation, s.keypressSpeed,
+                    s.sleepAnimation, s.sleepSpeed,
+                    static_cast<unsigned long>(s.sleepTimeoutMs), led.sleeping(),
+                    s.bleIndicators, s.mixMode, s.backlightBrightness,
+                    s.backlightR, s.backlightG, s.backlightB, s.layerFlashEnabled,
+                    s.nextLayerColorR, s.nextLayerColorG, s.nextLayerColorB,
+                    s.prevLayerColorR, s.prevLayerColorG, s.prevLayerColorB,
+                    s.layerFlashFadeMs);
+      return;
+    }
+    if (strcasecmp(what, "SPEED") == 0) {
+      char *which = next();
+      uint32_t speed;
+      if (which == nullptr || !rangedNumber(next(), 1, 255, speed)) {
+        Serial.println("ERR LED SPEED invalid_value");
+        return;
+      }
+      if (strcasecmp(which, "EFFECT") == 0) led.setEffectSpeed(speed);
+      else if (strcasecmp(which, "KEYPRESS") == 0) led.setKeypressSpeed(speed);
+      else if (strcasecmp(which, "SLEEP") == 0) led.setSleepSpeed(speed);
+      else {
+        Serial.println("ERR LED SPEED invalid_target");
+        return;
+      }
+      Serial.printf("OK LED SPEED %s %lu\n", which, static_cast<unsigned long>(speed));
+      return;
+    }
+    if (strcasecmp(what, "MIX") == 0) {
+      uint32_t mode;
+      if (!rangedNumber(next(), 0, 4, mode)) {
+        Serial.println("ERR LED MIX invalid_value");
+        return;
+      }
+      led.setMixMode(static_cast<LedMixMode>(mode));
+      Serial.printf("OK LED MIX %lu\n", static_cast<unsigned long>(mode));
+      return;
+    }
+    if (strcasecmp(what, "BACKLIGHT") == 0) {
+      uint32_t brightness, r = 0, g = 0, b = 0;
+      if (!rangedNumber(next(), 0, 255, brightness)) {
+        Serial.println("ERR LED BACKLIGHT invalid_value");
+        return;
+      }
+      char *rText = next();
+      if (rText != nullptr) {
+        if (!rangedNumber(rText, 0, 255, r) || !rangedNumber(next(), 0, 255, g) || !rangedNumber(next(), 0, 255, b)) {
+          Serial.println("ERR LED BACKLIGHT invalid_color");
+          return;
+        }
+      } else {
+        const LedGlobalSettings s = led.captureSettings();
+        r = s.backlightR; g = s.backlightG; b = s.backlightB;
+      }
+      led.setBacklight(static_cast<uint8_t>(brightness), CRGB(r, g, b));
+      Serial.println("OK LED BACKLIGHT");
+      return;
+    }
+    if (strcasecmp(what, "LAYERFLASH") == 0) {
+      bool enabled;
+      if (!isOn(next(), enabled)) {
+        Serial.println("ERR LED LAYERFLASH expected_ON_or_OFF");
+        return;
+      }
+      const LedGlobalSettings s = led.captureSettings();
+      CRGB nextC(s.nextLayerColorR, s.nextLayerColorG, s.nextLayerColorB);
+      CRGB prevC(s.prevLayerColorR, s.prevLayerColorG, s.prevLayerColorB);
+      uint16_t fade = s.layerFlashFadeMs;
+      uint32_t r, g, b;
+      char *rText = next();
+      if (rText != nullptr && rangedNumber(rText, 0, 255, r) && rangedNumber(next(), 0, 255, g) && rangedNumber(next(), 0, 255, b)) {
+        nextC = CRGB(r, g, b);
+        char *r2 = next();
+        if (r2 != nullptr && rangedNumber(r2, 0, 255, r) && rangedNumber(next(), 0, 255, g) && rangedNumber(next(), 0, 255, b)) {
+          prevC = CRGB(r, g, b);
+          uint32_t fadeIn;
+          if (number(next(), fadeIn)) fade = static_cast<uint16_t>(fadeIn);
+        }
+      }
+      led.setLayerFlash(enabled, nextC, prevC, fade);
+      Serial.println("OK LED LAYERFLASH");
+      return;
+    }
+    if (strcasecmp(what, "LAYER") == 0) {
+      uint32_t layer;
+      if (!rangedNumber(next(), 0, _keyboard.layerCount() - 1, layer)) {
+        Serial.println("ERR LED LAYER invalid_layer");
+        return;
+      }
+      char *field = next();
+      if (field == nullptr) {
+        Serial.println("ERR LED LAYER missing_argument");
+        return;
+      }
+      LayerLedSettings s = _keyboard.layerLed(static_cast<uint8_t>(layer));
+      if (strcasecmp(field, "BRIGHT") == 0) {
+        uint32_t value;
+        if (!rangedNumber(next(), 0, 255, value)) {
+          Serial.println("ERR LED LAYER BRIGHT invalid_value");
+          return;
+        }
+        s.brightness = static_cast<uint8_t>(value);
+      } else if (strcasecmp(field, "EFFECT") == 0) {
+        uint32_t value;
+        if (!rangedNumber(next(), 0, 255, value) || (value > LED_CUSTOM && value != LAYER_LED_FOLLOW_GLOBAL)) {
+          Serial.println("ERR LED LAYER EFFECT invalid_value");
+          return;
+        }
+        s.effect = static_cast<uint8_t>(value);
+      } else if (strcasecmp(field, "COLOR") == 0) {
+        uint32_t r, g, b;
+        if (!rangedNumber(next(), 0, 255, r) || !rangedNumber(next(), 0, 255, g) || !rangedNumber(next(), 0, 255, b)) {
+          Serial.println("ERR LED LAYER COLOR invalid_value");
+          return;
+        }
+        s.colorR = static_cast<uint8_t>(r);
+        s.colorG = static_cast<uint8_t>(g);
+        s.colorB = static_cast<uint8_t>(b);
+      } else {
+        Serial.println("ERR LED LAYER unknown_field");
+        return;
+      }
+      _keyboard.setLayerLed(static_cast<uint8_t>(layer), s);
+      Serial.println("OK LED LAYER");
       return;
     }
     if (strcasecmp(what, "ENABLE") == 0) {
@@ -531,6 +810,133 @@ void SerialCli::processLine(const char *line) {
     return;
   }
 
+  if (strcasecmp(command, "PRESET") == 0) {
+    char *action = next();
+    uint32_t slot;
+    if (action == nullptr || !rangedNumber(next(), 1, MULTIKEY_SLOT_COUNT, slot)) {
+      Serial.println("ERR PRESET invalid_arguments");
+      return;
+    }
+    if (strcasecmp(action, "SAVE") == 0) {
+      if (!_keyboard.savePresetSlot(static_cast<uint8_t>(slot - 1))) {
+        Serial.println("ERR PRESET SAVE failed");
+        return;
+      }
+    } else if (strcasecmp(action, "LOAD") == 0) {
+      if (!_keyboard.loadPresetSlot(static_cast<uint8_t>(slot - 1))) {
+        Serial.println("ERR PRESET LOAD failed");
+        return;
+      }
+    } else if (strcasecmp(action, "LIST") == 0) {
+      Serial.println("OK PRESET");
+      for (uint8_t i = 0; i < MULTIKEY_SLOT_COUNT; ++i) {
+        Serial.printf("SLOT %u %s\n", i + 1, _keyboard.presetExists(i) ? "SET" : "EMPTY");
+      }
+      Serial.println("END PRESET");
+      return;
+    } else {
+      Serial.println("ERR PRESET unknown_action");
+      return;
+    }
+    Serial.printf("OK PRESET %s slot=%lu\n", action, static_cast<unsigned long>(slot));
+    return;
+  }
+
+  if (strcasecmp(command, "MULTIKEY") == 0) {
+    char *action = next();
+    if (action == nullptr) {
+      Serial.println("ERR MULTIKEY missing_argument");
+      return;
+    }
+    if (strcasecmp(action, "STATUS") == 0) {
+      const GlobalSettings &g = _keyboard.globals();
+      Serial.printf("OK MULTIKEY enabled=%u id=%u role=%s slaves=%u save_slave=%u\n",
+                    g.multikeyEnabled, g.multikeyId,
+                    _keyboard.link().isMaster() ? "MASTER" : "SLAVE",
+                    _keyboard.link().connectedSlaves(), g.saveSlaveChanges);
+      return;
+    }
+    if (strcasecmp(action, "PUSH") == 0) {
+      _keyboard.link().pushConfig();
+      Serial.println("OK MULTIKEY PUSH");
+      return;
+    }
+    if (strcasecmp(action, "SLOT") == 0) {
+      char *op = next();
+      uint32_t slot;
+      if (op == nullptr || !rangedNumber(next(), 1, MULTIKEY_SLOT_COUNT, slot)) {
+        Serial.println("ERR MULTIKEY SLOT invalid_arguments");
+        return;
+      }
+      if (strcasecmp(op, "SAVE") == 0) {
+        if (!_keyboard.saveMultikeyConfigSlot(static_cast<uint8_t>(slot - 1), "MK CFG")) {
+          Serial.println("ERR MULTIKEY SLOT SAVE failed");
+          return;
+        }
+      } else if (strcasecmp(op, "LOAD") == 0) {
+        if (!_keyboard.loadMultikeyConfigSlot(static_cast<uint8_t>(slot - 1))) {
+          Serial.println("ERR MULTIKEY SLOT LOAD failed");
+          return;
+        }
+      } else {
+        Serial.println("ERR MULTIKEY SLOT unknown_action");
+        return;
+      }
+      Serial.printf("OK MULTIKEY SLOT %s slot=%lu\n", op, static_cast<unsigned long>(slot));
+      return;
+    }
+    Serial.println("ERR MULTIKEY unknown_action");
+    return;
+  }
+
+  if (strcasecmp(command, "MENU") == 0) {
+    char *action = next();
+    if (action != nullptr && strcasecmp(action, "OPEN") == 0) {
+      _keyboard.menu().open(true); // force: bypasses the post-EXIT reboot gate
+      Serial.println("OK MENU OPEN");
+    } else if (action != nullptr && strcasecmp(action, "CLOSE") == 0) {
+      _keyboard.menu().close();
+      Serial.println("OK MENU CLOSE");
+    } else {
+      Serial.println("ERR MENU expected_OPEN_or_CLOSE");
+    }
+    return;
+  }
+
+  if (strcasecmp(command, "GAME") == 0) {
+    char *action = next();
+    if (action == nullptr) {
+      Serial.println("ERR GAME missing_argument");
+      return;
+    }
+    if (strcasecmp(action, "LIST") == 0) {
+      Serial.println("OK GAME");
+      for (uint8_t i = 0; i < _keyboard.games().count(); ++i) {
+        Serial.printf("GAME %u %s\n", i, _keyboard.games().name(i));
+      }
+      Serial.println("END GAME");
+      return;
+    }
+    if (strcasecmp(action, "START") == 0) {
+      uint32_t index;
+      if (!rangedNumber(next(), 0, _keyboard.games().count() - 1, index)) {
+        Serial.println("ERR GAME START invalid_index");
+        return;
+      }
+      _keyboard.menu().close();
+      _keyboard.menu().startGame(static_cast<uint8_t>(index));
+      Serial.println("OK GAME START");
+      return;
+    }
+    if (strcasecmp(action, "STOP") == 0) {
+      _keyboard.games().stop();
+      Serial.println("OK GAME STOP");
+      return;
+    }
+    Serial.println("ERR GAME unknown_action");
+    return;
+  }
+
   Serial.printf("ERR %s unknown_command\n", command);
 }
 
@@ -538,17 +944,26 @@ void SerialCli::emitKeyEvent(const KeyEvent &event) {
   if (!_events) return;
   const char *type = event.type == KEY_EVENT_PRESS ? "PRESS" : event.type == KEY_EVENT_RELEASE ? "RELEASE"
                                                                                                : "HOLD";
-  Serial.printf("EVENT KEY type=%s index=%u row=%u col=%u layer=%u held_ms=%lu\n",
-                type, event.index, event.row, event.col, event.layer,
-                static_cast<unsigned long>(event.heldMs));
+  char line[96];
+  snprintf(line, sizeof(line), "EVENT KEY type=%s index=%u row=%u col=%u layer=%u held_ms=%lu\n",
+           type, event.index, event.row, event.col, event.layer,
+           static_cast<unsigned long>(event.heldMs));
+  Serial.print(line);
+  _keyboard.link().comWrite(reinterpret_cast<const uint8_t *>(line), strlen(line));
 }
 
 void SerialCli::emitLayerEvent(uint8_t active, uint8_t base) {
   if (!_events) return;
-  Serial.printf("EVENT LAYER active=%u base=%u\n", active, base);
+  char line[48];
+  snprintf(line, sizeof(line), "EVENT LAYER active=%u base=%u\n", active, base);
+  Serial.print(line);
+  _keyboard.link().comWrite(reinterpret_cast<const uint8_t *>(line), strlen(line));
 }
 
 void SerialCli::emitBleEvent(bool connected) {
   if (!_events) return;
-  Serial.printf("EVENT BLE state=%s\n", connected ? "CONNECTED" : "DISCONNECTED");
+  char line[48];
+  snprintf(line, sizeof(line), "EVENT BLE state=%s\n", connected ? "CONNECTED" : "DISCONNECTED");
+  Serial.print(line);
+  _keyboard.link().comWrite(reinterpret_cast<const uint8_t *>(line), strlen(line));
 }

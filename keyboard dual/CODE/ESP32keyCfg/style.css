@@ -141,7 +141,7 @@ body.offline #btn-connect { opacity: 1; pointer-events: auto; }
 
 #matrix-wrap { overflow-x: auto; padding-bottom: 4px; }
 #matrix {
-  display: grid; grid-template-columns: repeat(5, minmax(62px, 76px));
+  display: grid; grid-template-columns: repeat(7, minmax(62px, 76px));
   gap: 8px; justify-content: start;
 }
 .kb-key {
@@ -182,7 +182,7 @@ body.offline #btn-connect { opacity: 1; pointer-events: auto; }
 /* ---------- monitor grid ---------- */
 
 #monitor-grid {
-  display: grid; grid-template-columns: repeat(5, 44px); gap: 5px; margin: 10px 0;
+  display: grid; grid-template-columns: repeat(7, 44px); gap: 5px; margin: 10px 0;
 }
 .mon-key {
   width: 44px; height: 44px; border-radius: 6px;
@@ -354,6 +354,10 @@ body.offline #btn-connect { opacity: 1; pointer-events: auto; }
 @media (max-width: 720px) {
   #tabs { position: static; }
   .tab-page { padding: 12px; }
-  #matrix { grid-template-columns: repeat(5, minmax(52px, 1fr)); }
+  #matrix { grid-template-columns: repeat(7, minmax(52px, 1fr)); }
   .kb-key { min-height: 54px; }
 }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; margin: 8px 0; }
+#pal-stops .pal-stop { display: flex; align-items: center; gap: 6px; }
+#pal-stops input[type=color] { width: 44px; height: 26px; padding: 0; }

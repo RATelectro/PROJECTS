@@ -145,3 +145,64 @@ LED settings (enabled, brightness, base effect, color, keypress/sleep animations
 4. Read back the edited layer(s), compare against intended data, then `SAVE ALL`.
 5. For verification, send `RECALL ALL` followed by `GET KEYMAP ALL`.
 6. Enable `EVENTS ON` only when live key/layer/BLE monitoring is wanted.
+
+## Protocol version 2 (firmware 3.0) additions
+
+`INFO` reports `protocol=2`. All version-1 commands keep working; `LED STATUS`
+gains fields (extra key=value pairs — parsers must ignore unknown pairs).
+
+### Extended LED
+
+| Command | Response / purpose |
+|---|---|
+| `LED SPEED <EFFECT|KEYPRESS|SLEEP> <1..255>` | animation speed (128 = 1x) |
+| `LED MIX <0..4>` | stacking algorithm: 0 ADD NORM, 1 ADD CLIP, 2 MAX, 3 SCREEN, 4 HUE |
+| `LED BACKLIGHT <0..255> [r g b]` | idle-key backlight brightness + colour |
+| `LED LAYERFLASH <ON|OFF> [nr ng nb pr pg pb] [fadeMs]` | layer-change flash colours and fade |
+| `LED LAYER <layer> BRIGHT <0..255>` | per-layer brightness (stored in keymap) |
+| `LED LAYER <layer> EFFECT <0..4|255>` | per-layer effect; 255 = follow global |
+| `LED LAYER <layer> COLOR <r> <g> <b>` | per-layer colour; 0 0 0 = follow global |
+| `GET LEDLAYER <layer>` | `OK LEDLAYER layer=N brightness=B effect=E color=RRGGBB` |
+
+### Device globals
+
+`GET GLOBAL` returns one line of key=value pairs: `rollover usb bt bt_power
+mk mk_id mk_layout save_slave show_all lang oled_sleep nav=up,left,right,down,enter
+boot boot_ms nav_bright`.
+
+`SET GLOBAL <field> <value>` fields: `ROLLOVER (0|1|6KRO|NKRO)`, `USB (HID|CFG)`,
+`BT (HID|COM)`, `BTPOWER (0..7)`, `MK (ON|OFF)`, `MKID (0..5)`, `MKLAYOUT (0..255)`,
+`SAVECHANGES (ON|OFF)`, `SHOWALL (ON|OFF)`, `LANG (EN|RU)`, `OLEDSLEEP (seconds)`,
+`BOOTMENU (ON|OFF)`, `BOOTTIME (ms, min 1000)`, `NAVBRIGHT (0..255)`,
+`NAVKEYS <up> <left> <right> <down> <enter>`.
+
+### Palettes (stored in the keymap)
+
+| Command | Response / purpose |
+|---|---|
+| `GET PALETTE <0..15>` | `OK PALETTE index=N stops=C` then `STOP i r g b` lines, ends `END PALETTE` |
+| `SET PALETTE <idx> <stop> <r> <g> <b>` | edit a palette stop (up to 8) |
+
+### Presets and multikey
+
+| Command | Response / purpose |
+|---|---|
+| `PRESET SAVE <1..6>` / `PRESET LOAD <n>` | save/load full global config snapshot |
+| `PRESET LIST` | slot occupancy |
+| `MULTIKEY STATUS` | role, slave count, options |
+| `MULTIKEY PUSH` | push global config to connected slaves |
+| `MULTIKEY SLOT SAVE <n>` / `LOAD <n>` | multikey configuration slots on the master |
+
+### Menus and games
+
+| Command | Purpose |
+|---|---|
+| `MENU OPEN` / `MENU CLOSE` | drive the on-device menu over CDC |
+| `GAME LIST` / `GAME START <n>` / `GAME STOP` | games never send HID and are not stored |
+
+### Bluetooth COM port
+
+With `SET GLOBAL BT COM` the firmware exposes a Nordic-UART style service
+(0xFFE0/0xFFE1/0xFFE2). Commands received there are executed like CDC input;
+`EVENT` lines are mirrored to subscribed COM clients. Command replies remain
+on the USB CDC port.

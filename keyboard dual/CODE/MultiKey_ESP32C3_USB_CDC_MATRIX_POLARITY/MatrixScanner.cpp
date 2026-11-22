@@ -18,7 +18,11 @@ void MatrixScanner::update(uint32_t nowMs) {
   _changedMask = 0;
 
   for (uint8_t row = 0; row < Config::ROWS; ++row) {
-    for (uint8_t other = 0; other < Config::ROWS; ++other) {
+    // Descending order: ROW_PINS[4] (SCL/GPIO7) must fall before ROW_PINS[3]
+    // (SDA/GPIO8). When the bus idles released, SDA dropping while SCL is
+    // still high would be a spurious I2C START for the OLED. See the ordering
+    // rule in src/display/Ssd1306.cpp.
+    for (uint8_t other = Config::ROWS; other-- > 0; ) {
       digitalWrite(Config::ROW_PINS[other], Config::MATRIX_ROW_INACTIVE_LEVEL);
     }
     digitalWrite(Config::ROW_PINS[row], Config::MATRIX_ROW_ACTIVE_LEVEL);

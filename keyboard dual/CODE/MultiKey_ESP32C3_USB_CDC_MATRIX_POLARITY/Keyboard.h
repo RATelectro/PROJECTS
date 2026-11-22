@@ -7,6 +7,10 @@
 #include "LedController.h"
 #include "HidKeyboard.h"
 #include "SerialCli.h"
+#include "Settings.h"
+#include "src/menu/MenuApp.h"
+#include "src/multikey/LinkBle.h"
+#include "src/games/Games.h"
 
 enum KeyEventType : uint8_t {
     KEY_EVENT_PRESS = 0,
@@ -73,6 +77,34 @@ public:
     bool metadataDirty() const { return _metadataDirty; }
     bool storageAvailable() const { return _storeReady; }
 
+    // Per-layer LED settings (stored inside the keymap).
+    LayerLedSettings layerLed(uint8_t layer) const;
+    bool setLayerLed(uint8_t layer, const LayerLedSettings &settings);
+
+    // User palettes (stored inside the keymap).
+    const Palette *palettes() const { return _data.palettes; }
+    Palette *palettes() { return _data.palettes; }
+    bool savePalettes() { return _storeReady && _store.save(_data); }
+
+    // Device-wide global settings (rollover, USB/BT, multikey, OLED...).
+    GlobalSettings &globals() { return _globals; }
+    bool saveGlobals();
+    void noteGlobalsChanged() { _globalsDirty = true; _globalsChangedAtMs = millis(); }
+
+    // Preset slots: full global configuration snapshots.
+    bool savePresetSlot(uint8_t slot);
+    bool loadPresetSlot(uint8_t slot);
+    bool presetExists(uint8_t slot) const;
+
+    // Multikey configuration slots on the master.
+    bool saveMultikeyConfigSlot(uint8_t slot, const char *name);
+    bool loadMultikeyConfigSlot(uint8_t slot);
+    bool storeMultikeyBlob(uint8_t slot, const MultikeySlotBlob &blob);
+
+    // Full configuration apply (used by preset load and multikey pushes).
+    void applyReceivedConfig(const GlobalSettings &globals, const LedGlobalSettings &led);
+    void applyGlobalSettings(); // rollover / BT power / link role from globals
+
     // LED settings persistence (NVS). Settings are written automatically after
     // a quiet delay; this forces an immediate save (used by the LED SAVE cmd).
     bool saveLedSettings();
@@ -80,6 +112,10 @@ public:
     LedController &led() { return _led; }
     HidKeyboard &hid() { return _hid; }
     SerialCli &cli() { return _cli; }
+    MenuApp &menu() { return _menu; }
+    LinkBle &link() { return _link; }
+    GameManager &games() { return _games; }
+    bool uiActive() const { return _menu.active(); }
     void processSerialCommand(const char *line) { _cli.processLine(line); }
 
 private:
@@ -93,17 +129,26 @@ private:
     void keymapChanged();
     void markAllDirty();
     void clearMomentaryLayers();
+    void persistQuietSettings(uint32_t nowMs);
 
     MatrixScanner _scanner;
     LedController _led;
     HidKeyboard _hid;
     KeymapStore _store;
     SerialCli _cli;
+    MenuApp _menu;
+    LinkBle _link;
+    GameManager _games;
     KeymapData _data = {};
+    GlobalSettings _globals = defaultGlobalSettings();
     bool _storeReady = false;
     uint8_t _dirtyLayers = 0;
     bool _metadataDirty = false;
     uint32_t _lastLedSaveAttemptMs = 0;
+    bool _globalsDirty = false;
+    uint32_t _globalsChangedAtMs = 0;
+    uint32_t _lastGlobalsSaveAttemptMs = 0;
+    uint32_t _lastKeyActivityMs = 0;
 
     bool _physicalPressed[Config::NUM_KEYS] = {};
     KeyAction _latched[Config::NUM_KEYS] = {};

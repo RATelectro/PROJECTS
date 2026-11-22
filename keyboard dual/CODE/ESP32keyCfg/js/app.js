@@ -879,19 +879,29 @@
     return '';
   }
 
+  // Keys are drawn in the physical orientation from the schematic: 7 columns
+  // (matrix rows) wide by 5 rows (matrix cols) tall, numbered 1..35
+  // left-to-right top-to-bottom. Picture position n (0-based) maps to firmware
+  // index i as i = (n % rows) * cols + floor(n / rows).
+  function firmwareIndex(n, rows, cols) {
+    return (n % rows) * cols + Math.floor(n / rows);
+  }
+
   function renderGrid() {
     const matrix = $('#matrix');
     matrix.innerHTML = '';
     const keys = model.info ? model.info.keys : 35;
+    const rows = model.info ? model.info.rows : 7;
     const cols = model.info ? model.info.cols : 5;
-    matrix.style.gridTemplateColumns = `repeat(${cols}, minmax(62px, 76px))`;
+    matrix.style.gridTemplateColumns = `repeat(${rows}, minmax(62px, 76px))`;
     const layer = model.keymaps[selLayer] || [];
     $('#matrix-title').textContent = `Layer ${selLayer + 1} — “${model.layerNames[selLayer] || ''}” (${keys} keys)`;
-    for (let i = 0; i < keys; i++) {
+    for (let n = 0; n < keys; n++) {
+      const i = firmwareIndex(n, rows, cols);
       const a = layer[i] || MK.transparentAction();
       const lab = MK.actionLabel(a);
       const b = el('button', 'kb-key ' + lab.cls);
-      b.appendChild(el('span', 'k-pos', `${Math.floor(i / cols) + 1}.${(i % cols) + 1}`));
+      b.appendChild(el('span', 'k-pos', String(n + 1)));
       b.appendChild(el('span', 'k-main', lab.main));
       const sub = el('span', 'k-sub');
       if (a.t === 'transparent') {
@@ -902,7 +912,7 @@
         sub.textContent = lab.sub;
       }
       b.appendChild(sub);
-      b.title = `Row ${Math.floor(i / cols) + 1}, col ${(i % cols) + 1} (index ${i})\n${MK.actionDescription(a)}`;
+      b.title = `Key ${n + 1} · matrix row ${Math.floor(i / cols) + 1}, col ${(i % cols) + 1} (index ${i})\n${MK.actionDescription(a)}`;
       b.onclick = () => openKeyModal(i);
       matrix.appendChild(b);
     }
@@ -943,8 +953,10 @@
     const s = kmState;
     const overlay = el('div', 'modal-overlay');
     const box = el('div', 'modal');
+    const rows = model.info ? model.info.rows : 7;
     const cols = model.info ? model.info.cols : 5;
-    box.appendChild(el('h3', null, `Key — row ${Math.floor(s.index / cols) + 1}, col ${(s.index % cols) + 1} · layer ${selLayer + 1}`));
+    const pic = (s.index % cols) * rows + Math.floor(s.index / cols) + 1;
+    box.appendChild(el('h3', null, `Key ${pic} · layer ${selLayer + 1}`));
 
     const seg = el('div', 'seg');
     for (const [id, label] of [['hid', 'Key (HID)'], ['layer', 'Layer'], ['transparent', 'Transparent'], ['none', 'Disabled']]) {
@@ -1180,11 +1192,18 @@
     const info = model.info;
     if (!info) { g.innerHTML = ''; return; }
     if (!g.childNodes.length) {
-      for (let i = 0; i < info.keys; i++) g.appendChild(el('div', 'mon-key', String(i + 1)));
+      // Same physical orientation as the keymap grid: picture keys 1..35
+      // left-to-right top-to-bottom, each cell remembering its firmware index.
+      g.style.gridTemplateColumns = `repeat(${info.rows}, 44px)`;
+      for (let n = 0; n < info.keys; n++) {
+        const d = el('div', 'mon-key', String(n + 1));
+        d.dataset.index = firmwareIndex(n, info.rows, info.cols);
+        g.appendChild(d);
+      }
     }
     const set = new Set(pressedIndices);
-    for (let i = 0; i < g.childNodes.length; i++) {
-      g.childNodes[i].classList.toggle('pressed', set.has(i));
+    for (const child of g.childNodes) {
+      child.classList.toggle('pressed', set.has(Number(child.dataset.index)));
     }
   }
 
@@ -1267,7 +1286,7 @@
     for (const rec of recs) {
       const item = el('div', 'list-item');
       item.appendChild(el('span', 'li-icon', rec.kind === 'layer' ? '▤' : '⌨'));
-      item.appendChild(el('span', 'li-name', rec.name));
+      item.appendChild(el('span', 'li-name', rec.name + (rec.multikey ? ' [MK]' : '')));
       item.appendChild(el('span', 'li-meta', `${presetSummary(rec)} · ${fmtDate(rec.createdAt)}`));
       const actions = el('div', 'li-actions');
       const apply = el('button', 'btn small', 'Apply');
@@ -1327,7 +1346,7 @@
           holdMs: model.holdMs,
           keymaps: MK.clone(model.keymaps.slice(0, model.layerCount)),
         };
-    await idb.add('presets', { kind, name, createdAt: Date.now(), data });
+    await idb.add('presets', { kind, name, createdAt: Date.now(), multikey: !!document.querySelector('#preset-multikey')?.checked, data });
     renderPresets();
     toast(`Preset “${name}” saved`, 'success');
   }
@@ -1605,6 +1624,16 @@
 
     renderDeviceTab();
     renderLedTab();
+
+    // Bridge for js/globals.js (firmware 3.0 panels).
+    window.MKUI = {
+      client,
+      toast,
+      log,
+      uiConfirm,
+      layerCount: () => model.layerCount,
+      layerName: (i) => model.layerNames[i],
+    };
   }
 
   document.addEventListener('DOMContentLoaded', wire);

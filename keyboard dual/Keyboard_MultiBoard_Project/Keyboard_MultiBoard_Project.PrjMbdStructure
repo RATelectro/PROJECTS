@@ -1,4 +1,0 @@
-Record=DiagramHierarchy|SourceDocument=Keyboard.MbsDoc|Kind=Multi-board Schematic Module|Designator=2|Source=..\keyboard dual_brain\keyboard dual_brain.PrjPcb
-Record=SubProject|SourceDocument=Keyboard.MbsDoc|ProjectPath=..\keyboard dual_brain\keyboard dual_brain.PrjPcb
-Record=DiagramHierarchy|SourceDocument=Keyboard.MbsDoc|Kind=Multi-board Schematic Module|Designator=1|Source=..\keyboard_dual.PrjPcb
-Record=SubProject|SourceDocument=Keyboard.MbsDoc|ProjectPath=..\keyboard_dual.PrjPcb

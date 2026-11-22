@@ -1,5 +1,7 @@
 #include "Keyboard.h"
 #include "Keymaps.h"
+#include "src/display/Ssd1306.h"
+#include "src/led/Palettes.h"
 #include <string.h>
 
 MultiKey::MultiKey() : _cli(*this) {
@@ -12,6 +14,13 @@ void MultiKey::begin() {
     delay(100);
 
     _storeReady = _store.begin();
+
+    // Device-wide settings first: the BLE device name depends on them.
+    if (_storeReady) {
+        GlobalSettings stored;
+        if (_store.loadGlobal(stored)) _globals = stored;
+    }
+
     bool loaded = _storeReady && _store.load(_data);
     if (!loaded) {
         memset(&_data, 0, sizeof(_data));
@@ -20,6 +29,10 @@ void MultiKey::begin() {
         _data.holdMs = HOLD_DUR_MS;
         memcpy(_data.layerNames, DEFAULT_LAYER_NAMES, sizeof(_data.layerNames));
         loadDefaultKeymaps(_data.layers);
+        for (uint8_t layer = 0; layer < Config::MAX_LAYERS; ++layer) {
+            _data.layerLed[layer] = defaultLayerLedSettings();
+        }
+        initDefaultPalettes(_data.palettes);
         if (_storeReady) _store.save(_data);
     }
 
@@ -27,16 +40,26 @@ void MultiKey::begin() {
         _latched[index] = hidAction();
     }
     _scanner.begin();
+
+    Display.begin();
+    _hid.begin(*this);
     _led.begin();
     if (_storeReady) {
-        LedSettings ledSettings;
+        LedGlobalSettings ledSettings;
         if (_store.loadLed(ledSettings)) _led.applySettings(ledSettings);
     }
-    _led.playHello();
-    _hid.begin(*this);
+    _led.applyLayerSettings(_data.layerLed[_data.baseLayer]);
+    applyGlobalSettings();
+
+    _menu.begin(*this);
+    _link.begin(*this);
+    _cli.begin();
+
+    _led.playHello(); // 1 s rainbow sweep
+    _menu.open();     // boot chooser (or straight to the menu if disabled)
+
     _lastBleConnected = _hid.isConnected();
     _led.setBleConnected(_lastBleConnected);
-    _cli.begin();
 }
 
 void MultiKey::update() {
@@ -58,6 +81,9 @@ void MultiKey::update() {
         }
     }
 
+    // The menu is only offered at boot (red-key combo) or via the CLI; there
+    // is no hold-a-key shortcut to reopen it after EXIT.
+
     const bool connected = _hid.isConnected();
     if (connected != _lastBleConnected) {
         _lastBleConnected = connected;
@@ -66,18 +92,41 @@ void MultiKey::update() {
         if (_bleCallback) _bleCallback(connected, _bleContext);
     }
 
-    _hid.update(_physicalPressed, _latched);
+    // Menus/games own the keys and the display while active.
+    _menu.update(nowMs);
+    Display.update(); // one chunked I2C slice per loop
+
+    if (!_menu.active()) {
+        _hid.update(_physicalPressed, _latched);
+    }
     _led.update(nowMs);
+    _link.update();
     _cli.update();
 
-    // Persist LED settings after the user stops changing them.
-    if (_storeReady && _led.settingsDirty() &&
+    // OLED sleep on inactivity (menus and key presses wake it).
+    if (_globals.oledSleepTimeoutMs != 0 && !_menu.active() &&
+        static_cast<uint32_t>(nowMs - _lastKeyActivityMs) >= _globals.oledSleepTimeoutMs) {
+        Display.sleep();
+    }
+
+    persistQuietSettings(nowMs);
+    delay(1);
+}
+
+void MultiKey::persistQuietSettings(uint32_t nowMs) {
+    if (!_storeReady) return;
+    if (_led.settingsDirty() &&
         static_cast<uint32_t>(nowMs - _led.settingsChangedAtMs()) >= Config::LED_SETTINGS_SAVE_DELAY_MS &&
         static_cast<uint32_t>(nowMs - _lastLedSaveAttemptMs) >= Config::LED_SETTINGS_SAVE_RETRY_MS) {
         _lastLedSaveAttemptMs = nowMs;
         if (_store.saveLed(_led.captureSettings())) _led.markSettingsSaved();
     }
-    delay(1);
+    if (_globalsDirty &&
+        static_cast<uint32_t>(nowMs - _globalsChangedAtMs) >= Config::LED_SETTINGS_SAVE_DELAY_MS &&
+        static_cast<uint32_t>(nowMs - _lastGlobalsSaveAttemptMs) >= Config::LED_SETTINGS_SAVE_RETRY_MS) {
+        _lastGlobalsSaveAttemptMs = nowMs;
+        if (saveGlobals()) _globalsDirty = false;
+    }
 }
 
 bool MultiKey::isPressed(uint8_t index) const {
@@ -135,6 +184,84 @@ bool MultiKey::saveLedSettings() {
     return ok;
 }
 
+bool MultiKey::saveGlobals() {
+    if (!_storeReady) return false;
+    const bool ok = _store.saveGlobal(_globals);
+    if (ok) _globalsDirty = false;
+    return ok;
+}
+
+void MultiKey::applyGlobalSettings() {
+    _hid.setRollover(static_cast<RolloverMode>(_globals.rollover));
+    _link.applySettings();
+}
+
+void MultiKey::applyReceivedConfig(const GlobalSettings &globals,
+                                   const LedGlobalSettings &led) {
+    _globals = globals;
+    _led.applySettings(led);
+    _led.applyLayerSettings(_data.layerLed[activeLayer()]);
+    applyGlobalSettings();
+    saveGlobals();
+    saveLedSettings();
+    _hid.requestReport();
+}
+
+bool MultiKey::savePresetSlot(uint8_t slot) {
+    if (!_storeReady || slot >= MULTIKEY_SLOT_COUNT) return false;
+    PresetBlob blob;
+    blob.led = _led.captureSettings();
+    blob.global = _globals;
+    return _store.savePreset(slot, blob);
+}
+
+bool MultiKey::loadPresetSlot(uint8_t slot) {
+    PresetBlob blob;
+    if (!_storeReady || !_store.loadPreset(slot, blob)) return false;
+    applyReceivedConfig(blob.global, blob.led);
+    return true;
+}
+
+bool MultiKey::presetExists(uint8_t slot) const {
+    return _storeReady && _store.presetExists(slot);
+}
+
+bool MultiKey::saveMultikeyConfigSlot(uint8_t slot, const char *name) {
+    if (!_storeReady || slot >= MULTIKEY_SLOT_COUNT) return false;
+    MultikeySlotBlob blob = {};
+    if (name != nullptr) {
+        strncpy(blob.name, name, sizeof(blob.name) - 1);
+    }
+    blob.config.led = _led.captureSettings();
+    blob.config.global = _globals;
+    return _store.saveMultikeySlot(slot, blob);
+}
+
+bool MultiKey::loadMultikeyConfigSlot(uint8_t slot) {
+    MultikeySlotBlob blob;
+    if (!_storeReady || !_store.loadMultikeySlot(slot, blob)) return false;
+    applyReceivedConfig(blob.config.global, blob.config.led);
+    return true;
+}
+
+bool MultiKey::storeMultikeyBlob(uint8_t slot, const MultikeySlotBlob &blob) {
+    if (!_storeReady || slot >= MULTIKEY_SLOT_COUNT) return false;
+    return _store.saveMultikeySlot(slot, blob);
+}
+
+LayerLedSettings MultiKey::layerLed(uint8_t layer) const {
+    if (layer >= Config::MAX_LAYERS) return defaultLayerLedSettings();
+    return _data.layerLed[layer];
+}
+
+bool MultiKey::setLayerLed(uint8_t layer, const LayerLedSettings &settings) {
+    if (layer >= _data.layerCount) return false;
+    _data.layerLed[layer] = settings;
+    markAllDirty();
+    if (layer == activeLayer()) _led.applyLayerSettings(settings);
+    return true;
+}
+
 bool MultiKey::setHoldDurationThreshold(uint16_t durationMs) {
     if (durationMs == 0) return false;
     _data.holdMs = durationMs;
@@ -150,7 +277,9 @@ uint8_t MultiKey::activeLayer() const {
 bool MultiKey::setBaseLayer(uint8_t layer) {
     if (layer >= _data.layerCount) return false;
     if (_data.baseLayer != layer) {
+        const uint8_t previous = _data.baseLayer;
         _data.baseLayer = layer;
+        _led.notifyLayerChanged(layer, previous);
         layerChanged();
     }
     return true;
@@ -237,6 +366,7 @@ bool MultiKey::recallKeymaps(int layer) {
         layerChanged();
     } else {
         memcpy(_data.layers[layer], saved.layers[layer], sizeof(_data.layers[layer]));
+        _data.layerLed[layer] = saved.layerLed[layer];
         _dirtyLayers &= static_cast<uint8_t>(~(1U << layer));
     }
     keymapChanged();
@@ -250,6 +380,10 @@ void MultiKey::resetKeymaps(int layer) {
     defaults.holdMs = HOLD_DUR_MS;
     memcpy(defaults.layerNames, DEFAULT_LAYER_NAMES, sizeof(defaults.layerNames));
     loadDefaultKeymaps(defaults.layers);
+    for (uint8_t l = 0; l < Config::MAX_LAYERS; ++l) {
+        defaults.layerLed[l] = defaultLayerLedSettings();
+    }
+    initDefaultPalettes(defaults.palettes);
 
     if (layer < 0) {
         const uint32_t generation = _data.generation;
@@ -261,6 +395,7 @@ void MultiKey::resetKeymaps(int layer) {
         layerChanged();
     } else {
         memcpy(_data.layers[layer], defaults.layers[layer], sizeof(_data.layers[layer]));
+        _data.layerLed[layer] = defaults.layerLed[layer];
         _dirtyLayers |= static_cast<uint8_t>(1U << layer);
     }
     keymapChanged();
@@ -284,14 +419,33 @@ void MultiKey::handlePress(uint8_t index, uint32_t nowMs) {
     _holdFired[index] = false;
     _latched[index] = resolveAction(index);
     _led.onKeyPressed(index);
+    _lastKeyActivityMs = nowMs;
+    if (Display.asleep()) Display.wake();
+    if (_menu.active()) {
+        emitKeyEvent(KEY_EVENT_PRESS, index, nowMs);
+        return; // menus consume keys; no HID, no layer switching
+    }
     if (_latched[index].type == ACTION_LAYER) applyLayerPress(index, _latched[index]);
     emitKeyEvent(KEY_EVENT_PRESS, index, nowMs);
+    // Slaves forward resolved HID events to the master keyboard.
+    if (_globals.multikeyEnabled && _globals.multikeyId > 0 &&
+        _latched[index].type == ACTION_HID) {
+        _link.onKeyEvent(_latched[index].usage, _latched[index].modifiers, true);
+    }
     _hid.requestReport();
 }
 
 void MultiKey::handleRelease(uint8_t index, uint32_t nowMs) {
+    if (_menu.active()) {
+        emitKeyEvent(KEY_EVENT_RELEASE, index, nowMs);
+        return;
+    }
     if (_latched[index].type == ACTION_LAYER) applyLayerRelease(index, _latched[index]);
     emitKeyEvent(KEY_EVENT_RELEASE, index, nowMs);
+    if (_globals.multikeyEnabled && _globals.multikeyId > 0 &&
+        _latched[index].type == ACTION_HID) {
+        _link.onKeyEvent(_latched[index].usage, _latched[index].modifiers, false);
+    }
     _hid.requestReport();
 }
 
@@ -353,6 +507,7 @@ void MultiKey::emitKeyEvent(KeyEventType type, uint8_t index, uint32_t nowMs) {
 }
 
 void MultiKey::layerChanged() {
+    _led.applyLayerSettings(_data.layerLed[activeLayer()]);
     _cli.emitLayerEvent(activeLayer(), _data.baseLayer);
     if (_layerCallback) _layerCallback(activeLayer(), _data.baseLayer, _layerContext);
     _hid.updateDumpCharacteristic();

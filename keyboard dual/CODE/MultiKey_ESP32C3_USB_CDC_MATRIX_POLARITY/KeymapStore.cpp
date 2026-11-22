@@ -1,21 +1,28 @@
 #include "KeymapStore.h"
+#include "src/led/Palettes.h"
 #include <stddef.h>
 #include <string.h>
 
 namespace {
+
 const char *slotKey(uint8_t slot) {
     return slot == 0 ? "map_a" : "map_b";
 }
 
 const char *LED_KEY = "ledcfg";
+const char *GLOBAL_KEY = "globals";
 
-struct LedSettingsBlob {
-    uint32_t magic;
-    uint16_t version;
-    uint16_t reserved;
-    LedSettings settings;
-    uint32_t crc32;
-};
+void presetKey(uint8_t slot, char *out) {
+    out[0] = 'p'; out[1] = 'r'; out[2] = 's'; out[3] = 't';
+    out[4] = static_cast<char>('0' + slot);
+    out[5] = '\0';
+}
+
+void multikeyKey(uint8_t slot, char *out) {
+    out[0] = 'm'; out[1] = 'k'; out[2] = 's'; out[3] = 'l';
+    out[4] = static_cast<char>('0' + slot);
+    out[5] = '\0';
+}
 
 uint32_t crc32Of(const uint8_t *bytes, size_t length) {
     uint32_t crc = 0xFFFFFFFFUL;
@@ -27,7 +34,52 @@ uint32_t crc32Of(const uint8_t *bytes, size_t length) {
     }
     return crc ^ 0xFFFFFFFFUL;
 }
+
+template <typename Payload>
+bool putBlob(Preferences &preferences, const char *key, uint32_t magic,
+             uint16_t version, const Payload &payload) {
+    struct Blob {
+        uint32_t magic;
+        uint16_t version;
+        uint16_t reserved;
+        Payload payload;
+        uint32_t crc32;
+    } blob;
+    blob.magic = magic;
+    blob.version = version;
+    blob.reserved = 0;
+    blob.payload = payload;
+    blob.crc32 = crc32Of(reinterpret_cast<const uint8_t *>(&blob),
+                         offsetof(Blob, crc32));
+    if (preferences.putBytes(key, &blob, sizeof(blob)) != sizeof(blob)) return false;
+
+    Blob verify;
+    return preferences.getBytesLength(key) == sizeof(blob) &&
+           preferences.getBytes(key, &verify, sizeof(verify)) == sizeof(verify) &&
+           verify.crc32 == blob.crc32 &&
+           memcmp(&verify, &blob, sizeof(blob)) == 0;
 }
+
+template <typename Payload>
+bool getBlob(Preferences &preferences, const char *key, uint32_t magic,
+             uint16_t version, Payload &out) {
+    struct Blob {
+        uint32_t magic;
+        uint16_t version;
+        uint16_t reserved;
+        Payload payload;
+        uint32_t crc32;
+    } blob;
+    if (preferences.getBytesLength(key) != sizeof(blob)) return false;
+    if (preferences.getBytes(key, &blob, sizeof(blob)) != sizeof(blob)) return false;
+    if (blob.magic != magic || blob.version != version || blob.reserved != 0) return false;
+    if (blob.crc32 != crc32Of(reinterpret_cast<const uint8_t *>(&blob),
+                              offsetof(Blob, crc32))) return false;
+    out = blob.payload;
+    return true;
+}
+
+} // namespace
 
 bool KeymapStore::begin() {
     return _preferences.begin(Config::NVS_NAMESPACE, false);
@@ -45,6 +97,10 @@ bool KeymapStore::valid(const KeymapData &data) const {
         return false;
     }
     for (uint8_t layer = 0; layer < Config::MAX_LAYERS; ++layer) {
+        if (data.layerLed[layer].effect > LED_CUSTOM &&
+            data.layerLed[layer].effect != LAYER_LED_FOLLOW_GLOBAL) {
+            return false;
+        }
         for (uint8_t index = 0; index < Config::NUM_KEYS; ++index) {
             const KeyAction &action = data.layers[layer][index];
             if (action.type > ACTION_TRANSPARENT) return false;
@@ -55,11 +111,40 @@ bool KeymapStore::valid(const KeymapData &data) const {
             }
         }
     }
+    for (uint8_t i = 0; i < NUM_PALETTES; ++i) {
+        if (data.palettes[i].count > PALETTE_MAX_STOPS) return false;
+    }
+    return true;
+}
+
+bool KeymapStore::upgradeV2(KeymapData &data) const {
+    // Version 2 blobs end right before layerLed; sanity-check the old header.
+    if (data.magic != MAGIC || data.layerCount == 0 ||
+        data.layerCount > Config::MAX_LAYERS || data.baseLayer >= data.layerCount) {
+        return false;
+    }
+    for (uint8_t layer = 0; layer < Config::MAX_LAYERS; ++layer) {
+        data.layerLed[layer] = defaultLayerLedSettings();
+    }
+    initDefaultPalettes(data.palettes);
+    data.version = VERSION;
+    data.crc32 = checksum(data);
     return true;
 }
 
 bool KeymapStore::readSlot(uint8_t slot, KeymapData &out) {
-    if (_preferences.getBytesLength(slotKey(slot)) != sizeof(KeymapData)) return false;
+    const size_t length = _preferences.getBytesLength(slotKey(slot));
+    if (length != sizeof(KeymapData)) {
+        if (length == offsetof(KeymapData, layerLed)) {
+            // Migrate a v2 slot in place.
+            if (_preferences.getBytes(slotKey(slot), &out, length) != length) return false;
+            if (!upgradeV2(out)) return false;
+            save(out);
+            _activeSlot = slot;
+            return true;
+        }
+        return false;
+    }
     if (_preferences.getBytes(slotKey(slot), &out, sizeof(out)) != sizeof(out)) return false;
     if (!valid(out)) return false;
     for (uint8_t layer = 0; layer < Config::MAX_LAYERS; ++layer) {
@@ -121,30 +206,58 @@ bool KeymapStore::saveLayer(KeymapData &ram, uint8_t layer) {
     return save(stored);
 }
 
-bool KeymapStore::saveLed(const LedSettings &settings) {
-    LedSettingsBlob blob;
-    blob.magic = LED_MAGIC;
-    blob.version = LED_VERSION;
-    blob.reserved = 0;
-    blob.settings = settings;
-    blob.crc32 = crc32Of(reinterpret_cast<const uint8_t *>(&blob),
-                         offsetof(LedSettingsBlob, crc32));
-    if (_preferences.putBytes(LED_KEY, &blob, sizeof(blob)) != sizeof(blob)) return false;
-
-    LedSettingsBlob verify;
-    return _preferences.getBytesLength(LED_KEY) == sizeof(blob) &&
-           _preferences.getBytes(LED_KEY, &verify, sizeof(verify)) == sizeof(verify) &&
-           verify.crc32 == blob.crc32 &&
-           memcmp(&verify, &blob, sizeof(blob)) == 0;
+bool KeymapStore::saveLed(const LedGlobalSettings &settings) {
+    return putBlob(_preferences, LED_KEY, LED_MAGIC, LED_VERSION, settings);
 }
 
-bool KeymapStore::loadLed(LedSettings &out) {
-    LedSettingsBlob blob;
-    if (_preferences.getBytesLength(LED_KEY) != sizeof(blob)) return false;
-    if (_preferences.getBytes(LED_KEY, &blob, sizeof(blob)) != sizeof(blob)) return false;
-    if (blob.magic != LED_MAGIC || blob.version != LED_VERSION || blob.reserved != 0) return false;
-    if (blob.crc32 != crc32Of(reinterpret_cast<const uint8_t *>(&blob),
-                              offsetof(LedSettingsBlob, crc32))) return false;
-    out = blob.settings;
-    return true;
+bool KeymapStore::loadLed(LedGlobalSettings &out) {
+    return getBlob(_preferences, LED_KEY, LED_MAGIC, LED_VERSION, out);
+}
+
+bool KeymapStore::saveGlobal(const GlobalSettings &settings) {
+    return putBlob(_preferences, GLOBAL_KEY, GLOBAL_MAGIC, GLOBAL_VERSION, settings);
+}
+
+bool KeymapStore::loadGlobal(GlobalSettings &out) {
+    return getBlob(_preferences, GLOBAL_KEY, GLOBAL_MAGIC, GLOBAL_VERSION, out);
+}
+
+bool KeymapStore::savePreset(uint8_t slot, const PresetBlob &preset) {
+    if (slot >= MULTIKEY_SLOT_COUNT) return false;
+    char key[6];
+    presetKey(slot, key);
+    return putBlob(_preferences, key, PRESET_MAGIC, 1, preset);
+}
+
+bool KeymapStore::loadPreset(uint8_t slot, PresetBlob &out) {
+    if (slot >= MULTIKEY_SLOT_COUNT) return false;
+    char key[6];
+    presetKey(slot, key);
+    return getBlob(_preferences, key, PRESET_MAGIC, 1, out);
+}
+
+bool KeymapStore::presetExists(uint8_t slot) const {
+    if (slot >= MULTIKEY_SLOT_COUNT) return false;
+    char key[6];
+    presetKey(slot, key);
+    // Blob header is 12 bytes; just probe with a minimal header read.
+    // Preferences::getBytes() is non-const, hence the cast.
+    struct Header { uint32_t magic; uint16_t version; uint16_t reserved; } header;
+    return const_cast<Preferences &>(_preferences)
+                   .getBytes(key, &header, sizeof(header)) == sizeof(header) &&
+           header.magic == PRESET_MAGIC;
+}
+
+bool KeymapStore::saveMultikeySlot(uint8_t slot, const MultikeySlotBlob &blob) {
+    if (slot >= MULTIKEY_SLOT_COUNT) return false;
+    char key[6];
+    multikeyKey(slot, key);
+    return putBlob(_preferences, key, MKSLOT_MAGIC, 1, blob);
+}
+
+bool KeymapStore::loadMultikeySlot(uint8_t slot, MultikeySlotBlob &out) {
+    if (slot >= MULTIKEY_SLOT_COUNT) return false;
+    char key[6];
+    multikeyKey(slot, key);
+    return getBlob(_preferences, key, MKSLOT_MAGIC, 1, out);
 }
